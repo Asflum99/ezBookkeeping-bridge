@@ -1,0 +1,22 @@
+# --- Secretos y Configuración Local ---
+.env
+.env.*
+!.env.example
+mise.local.toml
+
+# --- Entornos Virtuales y Herramientas ---
+.venv/
+.python-version
+.mise/
+
+# --- Caché de Python y Compilación ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Sistemas Operativos ---
+.DS_Store
+Thumbs.db
