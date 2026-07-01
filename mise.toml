@@ -5,6 +5,18 @@ python = "3.12"
 description = "Levantar el servidor FastAPI en modo desarrollo (Reload)"
 run = "uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000"
 
+[tasks.set-webhook]
+description = "Configurar el webhook de pruebas"
+usage = '''
+arg "<url>" help="La URL nueva que te otorga cloudflared"
+'''
+
+run = '''
+curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+     -H "Content-Type: application/json" \
+     -d "{\"url\": \"${usage_url?}/webhook\"}"
+'''
+
 [tasks.start]
 description = "Levantar el servidor FastAPI en modo producción"
 run = "uv run uvicorn main:app --host 0.0.0.0 --port 8000"

@@ -20,3 +20,7 @@ __pycache__/
 # --- Sistemas Operativos ---
 .DS_Store
 Thumbs.db
+
+cuentas.json
+
+tmp/
