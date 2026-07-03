@@ -1,5 +1,7 @@
 import json
+import logging
 import os
+import sys
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -8,20 +10,23 @@ from file_manager import borrar_archivo_local, descargar_foto_telegram
 from services.ezbookkeeping_service import registrar_transaccion
 from services.groq_service import procesar_gasto_con_ia
 from utils.formateador import (
-    preparar_gasto_para_ezbookkeeping,
+    preparar_fecha_para_ezbookkeeping,
     preparar_mensaje_confirmacion,
 )
 
-telegram_token_bot_raw = os.getenv("TELEGRAM_BOT_TOKEN")
+logger = logging.getLogger("bot_finanzas")
+
+telegram_bot_token_raw = os.getenv("TELEGRAM_BOT_TOKEN")
 usuarios_raw = os.getenv("USUARIOS_PERMITIDOS")
 
-if not telegram_token_bot_raw or not usuarios_raw:
-    raise ValueError(
+if not telegram_bot_token_raw or not usuarios_raw:
+    logger.critical(
         "❌ Falta configurar el BOT_TOKEN o la lista de USUARIOS_PERMITIDOS"
     )
+    sys.exit(1)
 
-TELEGRAM_TOKEN_BOT = telegram_token_bot_raw
-USUARIOS_PERMITIDOS = set(os.getenv("USUARIOS_PERMITIDOS", "").split(","))
+TELEGRAM_TOKEN_BOT = telegram_bot_token_raw
+USUARIOS_PERMITIDOS = set(usuarios_raw.split(","))
 
 app = FastAPI()
 
@@ -33,8 +38,8 @@ def enviar_mensaje_telegram(chat_id: int, texto: str):
     try:
         with httpx.Client() as client:
             client.post(url, json=payload)
-    except Exception as e:
-        print(f"❌ Error al enviar mensaje a Telegram: {e}")
+    except Exception:
+        logger.exception("❌ Error al enviar mensaje a Telegram:")
 
 
 @app.get("/")
@@ -42,7 +47,7 @@ def health_check():
     return {"status": "ok"}
 
 
-def obtener_configuracion_usuario(chat_id: str) -> dict | None:
+def obtener_configuracion_usuario(user_id: str) -> dict | None:
     """Busca el token del usuario en cuentas.json usando su chat_id de Telegram"""
     ruta_cuentas = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "cuentas.json"
@@ -50,25 +55,26 @@ def obtener_configuracion_usuario(chat_id: str) -> dict | None:
     try:
         with open(ruta_cuentas, "r", encoding="utf-8") as f:
             cuentas = json.load(f)
-            return cuentas.get(str(chat_id))
-    except Exception as e:
-        print(f"❌ Error al leer cuentas.json: {e}")
+            user_info = cuentas.get(str(user_id))
+            return user_info
+    except Exception:
+        logger.exception("❌ Error al leer cuentas.json:")
         return None
 
 
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
     payload = await request.json()
-
     chat_id = payload["message"]["chat"]["id"]
     user_id = str(payload["message"]["from"]["id"])
 
     if user_id not in USUARIOS_PERMITIDOS:
-        print(f"🚫 Intento de acceso denegado para el ID: {user_id}")
+        logger.error(f"🚫 Intento de acceso denegado para el ID de Telegram: {user_id}")
         raise HTTPException(status_code=403, detail="Acceso no autorizado")
 
+    # Esto se eliminará en el futuro para admitir texto
     if "photo" not in payload["message"]:
-        print(f"⚠️ El usuario {user_id} envió algo que no es una foto.")
+        logger.error(f"⚠️ El usuario {user_id} envió algo que no es una foto.")
         enviar_mensaje_telegram(
             chat_id=chat_id,
             texto="Por ahora solo puedo recibir fotos de vouchers o boletas para registrar tus gastos. 📸",
@@ -81,10 +87,15 @@ async def telegram_webhook(request: Request):
     fotos = payload["message"]["photo"]
     foto_optima = fotos[-1]  # El último elemento siempre es el de mayor tamaño
     file_id = foto_optima["file_id"]
+    logger.debug(f"Foto a utilizarse: {file_id}")
 
-    config_usuario = obtener_configuracion_usuario(chat_id)
-    if not config_usuario:
-        print(f"🚫 Acceso denegado o usuario no registrado para el chat_id: {chat_id}")
+    user_info = obtener_configuracion_usuario(user_id)
+    logger.debug(f"Información del usuario:\n{user_info}")
+
+    if not user_info:
+        logger.error(
+            f"🚫 Acceso denegado o usuario no registrado para el user_id: {user_id}"
+        )
         enviar_mensaje_telegram(
             chat_id,
             "⛔ No estás registrado en el sistema del bot financiera. Pídele al administrador que te agregue.",
@@ -96,14 +107,14 @@ async def telegram_webhook(request: Request):
 
         datos_crudos_ia = procesar_gasto_con_ia(ruta_foto_local)
 
-        datos_limpios = preparar_gasto_para_ezbookkeeping(datos_crudos_ia)
+        datos_limpios = preparar_fecha_para_ezbookkeeping(datos_crudos_ia)
 
         medio_pago_ia: str = datos_limpios.get("medio_pago", "")
-        cuentas_usuario: dict = config_usuario.get("cuentas", {})
+        cuentas_usuario: dict = user_info.get("cuentas", {})
         source_account_id: str = cuentas_usuario.get(medio_pago_ia, "")
 
         gasto_guardado = registrar_transaccion(
-            datos_limpios, config_usuario["ez_token"], source_account_id
+            datos_limpios, user_info["ez_token"], source_account_id
         )
 
         mensaje_para_usuario = preparar_mensaje_confirmacion(datos_crudos_ia)
@@ -119,7 +130,7 @@ async def telegram_webhook(request: Request):
             )
 
     except FileNotFoundError:
-        print(
+        logger.critical(
             "⚠️ Notificando al usuario sobre fallo del sistema interno (Falta de Prompt)."
         )
         enviar_mensaje_telegram(
@@ -127,13 +138,13 @@ async def telegram_webhook(request: Request):
             texto="⚙️ Lo siento, nuestro sistema interno está experimentando fallas técnicas en este momento. Por favor, vuelve a intentarlo más tarde. 🙏",
         )
 
-    except Exception as e:
-        print(f"❌ Error durante el procesamiento general: {e}")
+    except Exception:
+        logger.critical("❌ Error durante el procesamiento general:")
         enviar_mensaje_telegram(
             chat_id=chat_id,
             texto="Hubo un problema al procesar la imagen de tu voucher. Inténtalo de nuevo. 😞",
         )
 
     finally:
-        if ruta_foto_local:
-            borrar_archivo_local(ruta_foto_local)
+        logger.info("Iniciando proceso de borrado de la foto del voucher")
+        borrar_archivo_local(ruta_foto_local)

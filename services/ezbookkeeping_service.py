@@ -1,12 +1,17 @@
+import logging
 import os
+import sys
 
 import httpx
 
+logger = logging.getLogger("bot_finanzas")
+
 EZBOOKKEEPING_URL = os.getenv("EZBOOKKEEPING_URL")
 if not EZBOOKKEEPING_URL:
-    print(
+    logger.critical(
         "❌ ERROR CRÍTICO: La variable de entorno EZBOOKKEEPING_URL no está configurada."
     )
+    sys.exit(1)
 
 
 def registrar_transaccion(
@@ -35,14 +40,35 @@ def registrar_transaccion(
         "sourceAccountId": source_account_id,
         "utcOffset": -300,
     }
+    logger.debug(
+        f"Iniciando registro de transacción con los siguientes valores:\n{body}"
+    )
 
     try:
         with httpx.Client() as client:
             respuesta = client.post(url, json=body, headers=headers, timeout=10.0)
-            if respuesta.status_code == 200 and respuesta.json().get("success"):
-                return True
-            print(f"❌ Error API ezBookkeeping: {respuesta.text}")
+            logger.debug(f"respuesta de la solicitud POST: {respuesta.status_code}")
+            if respuesta.status_code == 200:
+                try:
+                    res_json = respuesta.json()
+                    if res_json.get("success"):
+                        logger.info(
+                            "¡Transacción registrada exitosamente en ezBookkeeping!"
+                        )
+                        return True
+                except ValueError:
+                    logger.error(
+                        "❌ La API devolvió un estado 200 pero el cuerpo no era un JSON válido."
+                    )
+            logger.error(
+                f"❌ Error API ezBookkeeping. Código: {respuesta.status_code}. Respuesta: {respuesta.text}"
+            )
             return False
-    except Exception as e:
-        print(f"❌ Error de red en ezBookkeeping: {e}")
+    except httpx.RequestError:
+        logger.exception(
+            "❌ Error de red o Timeout al intentar conectar con ezBookkeeping"
+        )
+        return False
+    except Exception:
+        logger.exception("❌ Error inesperado en la función registrar_transaccion")
         return False

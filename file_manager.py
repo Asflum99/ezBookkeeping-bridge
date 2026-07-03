@@ -1,15 +1,18 @@
+import logging
 import os
 
 import httpx
 
 TMP_DIR = "tmp"
 
+logger = logging.getLogger("bot_finanzas")
+
 
 def asegurar_carpeta_temporal():
     """Crea la carpeta tmp si no existe"""
     if not os.path.exists(TMP_DIR):
         os.makedirs(TMP_DIR)
-        print(f"📁 Carpeta temporal '{TMP_DIR}' creada.")
+        logger.info(f"📁 Carpeta temporal '{TMP_DIR}' creada.")
 
 
 def descargar_foto_telegram(telegram_token_bot: str, file_id: str) -> str:
@@ -31,7 +34,6 @@ def descargar_foto_telegram(telegram_token_bot: str, file_id: str) -> str:
             raise Exception("Telegram no pudo procesar el file_id")
 
         file_path = datos_archivo["result"]["file_path"]
-        print(file_path)
 
         url_descarga = (
             f"https://api.telegram.org/file/bot{telegram_token_bot}/{file_path}"
@@ -46,7 +48,7 @@ def descargar_foto_telegram(telegram_token_bot: str, file_id: str) -> str:
                 for chunk in stream_response.iter_bytes():
                     f.write(chunk)
 
-        print(f"⬇️ Archivo guardado localmente en: {ruta_local_destino}")
+        logger.info(f"⬇️ Archivo guardado localmente en: {ruta_local_destino}")
         return ruta_local_destino
 
 
@@ -55,6 +57,6 @@ def borrar_archivo_local(ruta_archivo: str):
     try:
         if os.path.exists(ruta_archivo):
             os.remove(ruta_archivo)
-            print(f"🗑️ Archivo temporal eliminado: {ruta_archivo}")
-    except Exception as e:
-        print(f"⚠️ No se pudo borrar el archivo {ruta_archivo}: {e}")
+            logger.info(f"🗑️ Archivo temporal eliminado: {ruta_archivo}")
+    except Exception:
+        logger.exception(f"⚠️ No se pudo borrar el archivo {ruta_archivo}:")
