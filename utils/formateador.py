@@ -8,22 +8,30 @@ def preparar_gasto_para_ezbookkeeping(datos_ia: dict) -> dict:
     Toma la fecha de la IA y procesa tanto formato de 24 horas
     como de 12 horas (AM/PM) tradicional en vouchers peruanos.
     """
-    fecha_limpia = datos_ia.get(
-        "fecha_hora", ""
-    ).strip()  # TODO: Evaluar si usar valor default
+    fecha_limpia = datos_ia.get("fecha_hora", "").strip()
+
+    fecha_procesada = (
+        fecha_limpia.replace("p.m.", "PM")
+        .replace("p. m.", "PM")
+        .replace("a.m.", "AM")
+        .replace("a. m.", "AM")
+        .replace("pm", "PM")
+        .replace("am", "AM")
+    )
+    # Reemplazamos múltiples espacios por uno solo por si acaso quedó "10:24  PM"
+    fecha_procesada = " ".join(fecha_procesada.split())
 
     formatos_a_intentar = [
-        "%d-%m-%Y %H:%M:%S",  # 29-06-2026 18:28:00 (24h con segundos)
-        "%d-%m-%Y %H:%M",  # 29-06-2026 18:28    (24h sin segundos)
-        "%d-%m-%Y %I:%M:%S %p",  # 29-06-2026 06:28:00 PM (12h con segundos)
-        "%d-%m-%Y %I:%M %p",  # 29-06-2026 06:28 PM    (12h con segundos)
+        "%d-%m-%Y %H:%M:%S",  # 29-06-2026 18:28:00
+        "%d-%m-%Y %H:%M",  # 29-06-2026 18:28
+        "%d-%m-%Y %I:%M:%S %p",  # 29-06-2026 06:28:00 PM
+        "%d-%m-%Y %I:%M %p",  # 29-06-2026 06:28 PM
     ]
 
     fecha_objeto = None
 
     for formato in formatos_a_intentar:
         try:
-            fecha_procesada = fecha_limpia.replace("p.m.", "PM").replace("a.m.", "AM")
             fecha_objeto = datetime.strptime(fecha_procesada, formato)
             break
         except ValueError:
@@ -33,7 +41,7 @@ def preparar_gasto_para_ezbookkeeping(datos_ia: dict) -> dict:
         datos_ia["fecha_hora"] = int(fecha_objeto.timestamp())
     else:
         print(
-            f"⚠️ No se pudo reconocer el formato de fecha: {fecha_limpia}. Usando fecha actual."
+            f"⚠️ No se pudo reconocer el formato de fecha: {fecha_limpia} (Procesada como: {fecha_procesada}). Usando fecha actual."
         )
         datos_ia["fecha_hora"] = int(datetime.now().timestamp())
 
