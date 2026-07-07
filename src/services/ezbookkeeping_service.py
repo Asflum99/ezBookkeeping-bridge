@@ -15,7 +15,7 @@ if not EZBOOKKEEPING_URL:
 
 
 def registrar_transaccion(
-    datos_gasto: dict, token_usuario: str, source_account_id: str
+    datos_gasto: dict, user_info: dict, source_account_id: str
 ) -> bool:
     """
     Envía el gasto usando el token específico del usuario que mandó el voucher.
@@ -23,7 +23,7 @@ def registrar_transaccion(
     url = f"{EZBOOKKEEPING_URL}/api/v1/transactions/add.json"
 
     headers = {
-        "Authorization": f"Bearer {token_usuario}",
+        "Authorization": f"Bearer {user_info['ez_token']}",
         "Content-Type": "application/json",
         "X-Timezone-Name": "America/Lima",
         "X-Timezone-Offset": "-300",
@@ -40,6 +40,7 @@ def registrar_transaccion(
         "sourceAccountId": source_account_id,
         "utcOffset": -300,
     }
+
     logger.debug(
         f"Iniciando registro de transacción con los siguientes valores:\n{body}"
     )
@@ -47,7 +48,8 @@ def registrar_transaccion(
     try:
         with httpx.Client() as client:
             respuesta = client.post(url, json=body, headers=headers, timeout=10.0)
-            logger.debug(f"respuesta de la solicitud POST: {respuesta.status_code}")
+            logger.debug(f"Respuesta de la solicitud POST: {respuesta.status_code}")
+
             if respuesta.status_code == 200:
                 try:
                     res_json = respuesta.json()
@@ -60,10 +62,12 @@ def registrar_transaccion(
                     logger.error(
                         "❌ La API devolvió un estado 200 pero el cuerpo no era un JSON válido."
                     )
+
             logger.error(
                 f"❌ Error API ezBookkeeping. Código: {respuesta.status_code}. Respuesta: {respuesta.text}"
             )
             return False
+
     except httpx.RequestError:
         logger.exception(
             "❌ Error de red o Timeout al intentar conectar con ezBookkeeping"

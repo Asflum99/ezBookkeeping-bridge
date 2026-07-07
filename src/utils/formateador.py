@@ -1,7 +1,6 @@
-import json
 import logging
-import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger("bot_finanzas")
 
@@ -54,21 +53,6 @@ def preparar_fecha_para_ezbookkeeping(datos_ia: dict) -> dict:
     return datos_ia
 
 
-def obtener_nombre_categoria(category_id: str) -> str:
-    """Busca el nombre legible de la categoría en el JSON usando el ID"""
-    ruta_json = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "categorias.json"
-    )
-    try:
-        with open(ruta_json, "r", encoding="utf-8") as f:
-            cat_map = json.load(f)
-            categoria = cat_map.ge(str(category_id), "🛒 Otros Gastos (No mapeado)")
-            return categoria
-    except Exception:
-        logger.exception("No se encontró categoría, usando valor placeholder")
-        return "🛒 Otros Gastos"
-
-
 def preparar_mensaje_confirmacion(datos_crudos: dict) -> str:
     """
     Toma los datos originales de la IA (legibles) y arma un mensaje
@@ -83,9 +67,9 @@ def preparar_mensaje_confirmacion(datos_crudos: dict) -> str:
     try:
         if fecha:
             timestamp_segundos = float(fecha)
-
-            fecha_objeto = datetime.fromtimestamp(timestamp_segundos)
-
+            fecha_objeto = datetime.fromtimestamp(
+                timestamp_segundos, tz=ZoneInfo("America/Lima")
+            )
             fecha_bonita = fecha_objeto.strftime("%d-%m-%Y %I:%M %p").lower()
         else:
             logger.warning("No se encontró fecha, usando valor placeholder")
@@ -97,19 +81,18 @@ def preparar_mensaje_confirmacion(datos_crudos: dict) -> str:
     medio_pago_raw = datos_crudos.get("medio_pago", "")
     medios_traducidos = {
         "billetera_digital": "📱 Billetera Digital (Yape/Plin/Débito)",
-        "tarjeta_credito": "💳 Tarjeta de Crédito BCP",
+        "tarjeta_credito": "💳 Tarjeta de Crédito",
     }
     medio_pago_bonito = medios_traducidos.get(medio_pago_raw, "❓ Desconocido")
 
-    id_categoria_ia = datos_crudos.get("categoria", "")
-    categoria_bonita = obtener_nombre_categoria(id_categoria_ia)
+    categoria_bonita = datos_crudos.get("categoria", "❓ Desconocida")
 
     mensaje = (
-        f"✅ ¡Gasto registrado con éxito!\n"
+        f"✅ ¡Gasto registrado con éxito!\n\n"
         f"💰 Monto: S/. {monto}\n"
         f"📝 Descripción: {descripcion}\n"
         f"📅 Fecha: {fecha_bonita}\n"
         f"💳 Método: {medio_pago_bonito}\n"
-        f"🏷️ Categoría ID: {categoria_bonita}"
+        f"🏷️ Categoría: {categoria_bonita}"
     )
     return mensaje

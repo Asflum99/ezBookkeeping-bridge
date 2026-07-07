@@ -12,7 +12,7 @@ ARCHIVO_LOG = os.path.join(CARPETA_LOGS, "bot.log")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 handler = RotatingFileHandler(
-    "logs/bot.log",
+    ARCHIVO_LOG,
     maxBytes=5 * 1024 * 1024,
     backupCount=3,
     encoding="utf-8",
