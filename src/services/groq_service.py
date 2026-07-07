@@ -11,7 +11,7 @@ logger = logging.getLogger("bot_finanzas")
 def _cargar_prompt_sistema(nombre_archivo: str) -> str:
     """Lee el contenido de un archivo de prompt en la carpeta prompts/"""
     ruta_base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ruta_prompt = os.path.join(ruta_base, "prompts", nombre_archivo)
+    ruta_prompt = os.path.join(ruta_base, "config/prompts", nombre_archivo)
 
     with open(ruta_prompt, "r", encoding="utf-8") as archivo:
         return archivo.read()
@@ -56,9 +56,7 @@ def procesar_gasto_con_ia(ruta_foto_local: str) -> dict:
         if datos_str := chat_completion.choices[0].message.content:
             datos_dict: dict = json.loads(datos_str)
 
-            logger.info(
-                "Groq extrajo los datos del voucher con éxito."
-            )
+            logger.info("Groq extrajo los datos del voucher con éxito.")
             logger.debug(
                 f"JSON crudo devuelto por la IA:\n{json.dumps(datos_dict, indent=2)}"
             )

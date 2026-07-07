@@ -9,25 +9,24 @@ os.makedirs(CARPETA_LOGS, exist_ok=True)
 
 ARCHIVO_LOG = os.path.join(CARPETA_LOGS, "bot.log")
 
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_LEVEL_STR = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_LEVEL_NUMERIC = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 
-handler = RotatingFileHandler(
+file_handler = RotatingFileHandler(
     ARCHIVO_LOG,
     maxBytes=5 * 1024 * 1024,
     backupCount=3,
     encoding="utf-8",
 )
 
+stream_handler = logging.StreamHandler()
+
 logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL),
+    level=LOG_LEVEL_NUMERIC,
     format="[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[
-        logging.FileHandler(ARCHIVO_LOG, encoding="utf-8"),
-        logging.StreamHandler(),
-    ],
+    handlers=[file_handler, stream_handler],
 )
 
 logger = logging.getLogger("bot_finanzas")
-logger.setLevel(logging.INFO)
-logger.addHandler(handler)
+logger.setLevel(LOG_LEVEL_NUMERIC)

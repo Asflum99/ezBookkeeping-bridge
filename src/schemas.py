@@ -1,18 +1,15 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
-
-# ==========================================
-# Modelos para Telegram
-# ==========================================
 
 
 class TelegramChat(BaseModel):
     id: int
+    type: str
 
 
 class TelegramUser(BaseModel):
-    id: str
+    id: int
     is_bot: bool
     first_name: str
 
@@ -20,19 +17,24 @@ class TelegramUser(BaseModel):
 class TelegramPhotoSize(BaseModel):
     file_id: str
     file_unique_id: str
+    width: int
+    height: int
+    file_size: Optional[int] = None
 
 
 class TelegramMessage(BaseModel):
+    message_id: int
+    date: int
     chat: TelegramChat
-    from_user: TelegramUser = Field(..., alias="from")
-    photo: List[TelegramPhotoSize] = []
+
+    from_user: Optional[TelegramUser] = Field(None, alias="from")
+    photo: Optional[List[TelegramPhotoSize]] = None
 
 
 class TelegramUpdate(BaseModel):
-    """Representa el payload crudo que envía el webhook de Telegram"""
-
     update_id: int
-    message: TelegramMessage
+
+    message: Optional[TelegramMessage] = None
 
 
 # ==========================================

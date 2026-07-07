@@ -24,3 +24,5 @@ Thumbs.db
 cuentas.json
 
 tmp/
+
+logs/

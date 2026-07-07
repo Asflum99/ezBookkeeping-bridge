@@ -1,12 +1,13 @@
-import logging
 import os
 import sys
+from typing import List
 
 from fastapi import FastAPI, HTTPException
 
+from config.logger import logger
 from core.file_manager import borrar_archivo_local, descargar_foto_telegram
 from core.usuarios import verificar_registro_usuario
-from schemas import TelegramUpdate
+from schemas import TelegramMessage, TelegramPhotoSize, TelegramUpdate
 from services.ezbookkeeping_service import registrar_transaccion
 from services.groq_service import procesar_gasto_con_ia
 from services.telegram_service import enviar_mensaje_telegram
@@ -19,8 +20,6 @@ from utils.formateador import (
 # ⚙️ CONFIGURACIONES GLOBALES E INICIALIZACIÓN
 # ==========================================
 
-logger = logging.getLogger("bot_finanzas")
-
 telegram_bot_token_raw = os.getenv("TELEGRAM_BOT_TOKEN")
 usuarios_raw = os.getenv("USUARIOS_PERMITIDOS")
 
@@ -31,7 +30,9 @@ if not telegram_bot_token_raw or not usuarios_raw:
     sys.exit(1)
 
 TELEGRAM_TOKEN_BOT = telegram_bot_token_raw
-USUARIOS_PERMITIDOS = set(usuarios_raw.split(","))
+USUARIOS_PERMITIDOS = set(
+    int(uid.strip()) for uid in usuarios_raw.split(",")
+)  # TODO: Preguntar por qué funciona
 
 app = FastAPI()
 
@@ -41,7 +42,7 @@ app = FastAPI()
 
 
 def validar_acceso_y_contenido(
-    payload: TelegramUpdate, user_id: str, chat_id: int
+    message: TelegramMessage, user_id: int, chat_id: int
 ) -> bool:
     """
     Valida si el usuario está en la lista blanca y si envió una foto.
@@ -53,7 +54,7 @@ def validar_acceso_y_contenido(
         )
         raise HTTPException(status_code=403, detail="Acceso no autorizado")
 
-    if not payload.message.photo:
+    if not message.photo:
         logger.info(f"💡 El usuario {user_id} envió algo que no es una foto.")
         enviar_mensaje_telegram(
             TELEGRAM_TOKEN_BOT,
@@ -65,9 +66,9 @@ def validar_acceso_y_contenido(
     return True
 
 
-def obtener_foto_optima_id(payload: TelegramUpdate) -> str:
+def obtener_foto_optima_id(photo: List[TelegramPhotoSize]) -> str:
     """Extrae el file_id de la imagen con mayor resolución."""
-    fotos = payload.message.photo
+    fotos = photo
     foto_optima = fotos[-1]  # El último elemento siempre es el más grande
     file_id = foto_optima.file_id
     logger.debug(f"Foto óptima detectada a procesar: {file_id}")
@@ -87,16 +88,42 @@ def health_check():
 # TODO: Cambiar el path a /webhook/telegram
 @app.post("/webhook")
 async def telegram_webhook(payload: TelegramUpdate):
+    if not payload.message:
+        logger.info(
+            f"💡 Se recibió un update de Telegram (ID: {payload.update_id}) que no contiene un mensaje común. Ignorando flujo."
+        )
+        return {
+            "status": "success",
+            "detail": "Update recibido pero no contiene un 'message' válido para procesar.",
+        }
+
     chat_id = payload.message.chat.id
+    if not payload.message.from_user:
+        logger.info(
+            f"No se pudo encontrar el usuario autor del mensaje de Telegram (ID: {payload.message})"
+        )
+        return {
+            "status": "success",
+            "detail": "Mensaje recibido, pero no se pudo identificar al autor.",
+        }
     user_id = payload.message.from_user.id
 
-    if not validar_acceso_y_contenido(payload, user_id, chat_id):
+    if not validar_acceso_y_contenido(payload.message, user_id, chat_id):
         return {
             "status": "success",
             "detail": "Contenido no soportado o flujo controlado.",
         }
 
-    file_id = obtener_foto_optima_id(payload)
+    if not payload.message.photo:
+        logger.info(
+            f"No se pudo encontrar imágenes en el mensaje de Telegram (ID: {payload.message})"
+        )
+        return {
+            "status": "success",
+            "detail": "No hay imágenes en el mensaje de Telegram.",
+        }
+
+    file_id = obtener_foto_optima_id(payload.message.photo)
 
     user_info = verificar_registro_usuario(TELEGRAM_TOKEN_BOT, user_id, chat_id)
     if not user_info:

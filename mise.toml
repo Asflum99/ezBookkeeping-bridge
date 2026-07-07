@@ -3,7 +3,7 @@ python = "3.12"
 
 [tasks.dev]
 description = "Levantar el servidor FastAPI en modo desarrollo (Reload)"
-run = "uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000"
+run = "uv run uvicorn main:app --app-dir src --reload --host 127.0.0.1 --port 8000"
 
 [tasks.set-webhook]
 description = "Configurar el webhook de pruebas"
