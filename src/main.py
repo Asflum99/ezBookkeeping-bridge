@@ -10,6 +10,7 @@ from core.usuarios import verificar_registro_usuario
 from schemas import TelegramMessage, TelegramPhotoSize, TelegramUpdate
 from services.ezbookkeeping_service import registrar_transaccion
 from services.groq_service import procesar_gasto_con_ia
+from services.guardian import validate_and_extract_message
 from services.telegram_service import enviar_mensaje_telegram
 from utils.formateador import (
     preparar_fecha_para_ezbookkeeping,
@@ -17,7 +18,7 @@ from utils.formateador import (
 )
 
 # ==========================================
-# ⚙️ CONFIGURACIONES GLOBALES E INICIALIZACIÓN
+# CONFIGURACIONES GLOBALES E INICIALIZACIÓN
 # ==========================================
 
 telegram_bot_token_raw = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -88,33 +89,21 @@ def health_check():
 # TODO: Cambiar el path a /webhook/telegram
 @app.post("/webhook")
 async def telegram_webhook(payload: TelegramUpdate):
-    if not payload.message:
-        logger.info(
-            f"💡 Se recibió un update de Telegram (ID: {payload.update_id}) que no contiene un mensaje común. Ignorando flujo."
-        )
-        return {
-            "status": "success",
-            "detail": "Update recibido pero no contiene un 'message' válido para procesar.",
-        }
+    message = validate_and_extract_message(payload)
+    if isinstance(message, dict):
+        logger.info(f"Webhook execution halted: {message.get('detail')}")
+        return message
 
-    chat_id = payload.message.chat.id
-    if not payload.message.from_user:
-        logger.info(
-            f"No se pudo encontrar el usuario autor del mensaje de Telegram (ID: {payload.message})"
-        )
-        return {
-            "status": "success",
-            "detail": "Mensaje recibido, pero no se pudo identificar al autor.",
-        }
-    user_id = payload.message.from_user.id
+    chat_id = message.chat.id
+    user_id = message.from_user.id
 
-    if not validar_acceso_y_contenido(payload.message, user_id, chat_id):
+    if not validar_acceso_y_contenido(message, user_id, chat_id):
         return {
             "status": "success",
             "detail": "Contenido no soportado o flujo controlado.",
         }
 
-    if not payload.message.photo:
+    if not message.photo:
         logger.info(
             f"No se pudo encontrar imágenes en el mensaje de Telegram (ID: {payload.message})"
         )
@@ -123,7 +112,7 @@ async def telegram_webhook(payload: TelegramUpdate):
             "detail": "No hay imágenes en el mensaje de Telegram.",
         }
 
-    file_id = obtener_foto_optima_id(payload.message.photo)
+    file_id = obtener_foto_optima_id(message.photo)
 
     user_info = verificar_registro_usuario(TELEGRAM_TOKEN_BOT, user_id, chat_id)
     if not user_info:
@@ -207,7 +196,6 @@ async def telegram_webhook(payload: TelegramUpdate):
         )
 
     finally:
-        # 💡 Se unificó el log para que solo se ejecute si realmente hay algo que borrar
         if ruta_foto_local:
             logger.info("Iniciando proceso de borrado de la foto del voucher")
             borrar_archivo_local(ruta_foto_local)
