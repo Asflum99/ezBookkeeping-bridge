@@ -1,56 +1,55 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 logger = logging.getLogger("bot_finanzas")
 
 
-def preparar_fecha_para_ezbookkeeping(datos_ia: dict) -> dict:
+def validate_and_sanitize_voucher_data(raw_data: dict[str, Any]) -> dict[str, Any]:
     """
-    Toma la fecha de la IA y procesa tanto formato de 24 horas
-    como de 12 horas (AM/PM) tradicional en vouchers peruanos.
+    Validates the 'date_time' field inside the LLM raw data dictionary.
+    If the date is invalid, out of the 2-week range, or missing, it falls back
+    to the current system time.
+
+    Returns the updated dictionary with the sanitized ISO date string.
     """
-    logger.info("Iniciando limpieza de fecha para poder registrarlo en ezbookkeeping")
-    logger.debug(f"Datos recibidos:\n{datos_ia}")
+    sanitized_data = raw_data.copy()
 
-    fecha_limpia = datos_ia.get("fecha_hora", "").strip()
+    now = datetime.now()
+    two_weeks_ago = now - timedelta(days=14)
+    fallback_date_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
-    fecha_procesada = (
-        fecha_limpia.replace("p.m.", "PM")
-        .replace("p. m.", "PM")
-        .replace("a.m.", "AM")
-        .replace("a. m.", "AM")
-        .replace("pm", "PM")
-        .replace("am", "AM")
-    )
-    fecha_procesada = " ".join(fecha_procesada.split())
+    extracted_date_str = sanitized_data.get("date_time")
 
-    formatos_a_intentar = [
-        "%d-%m-%Y %H:%M:%S",  # 29-06-2026 18:28:00
-        "%d-%m-%Y %H:%M",  # 29-06-2026 18:28
-        "%d-%m-%Y %I:%M:%S %p",  # 29-06-2026 06:28:00 PM
-        "%d-%m-%Y %I:%M %p",  # 29-06-2026 06:28 PM
-    ]
-
-    fecha_objeto = None
-
-    for formato in formatos_a_intentar:
-        try:
-            fecha_objeto = datetime.strptime(fecha_procesada, formato)
-            break
-        except ValueError:
-            continue
-
-    if fecha_objeto:
-        datos_ia["fecha_hora"] = int(fecha_objeto.timestamp())
-    else:
+    if not extracted_date_str:
         logger.warning(
-            f"⚠️ No se pudo reconocer el formato de fecha: {fecha_limpia} (Procesada como: {fecha_procesada}). Usando fecha actual."
+            "No 'date_time' field found in LLM raw data. Falling back to current system time."
         )
-        datos_ia["fecha_hora"] = int(datetime.now().timestamp())
+        sanitized_data["date_time"] = fallback_date_str
+        return sanitized_data
 
-    logger.info("Retornando fecha ya procesada")
-    return datos_ia
+    try:
+        extracted_date = datetime.strptime(extracted_date_str, "%Y-%m-%d %H:%M:%S")
+
+        if two_weeks_ago <= extracted_date <= now:
+            logger.debug(f"Voucher date successfully validated: {extracted_date_str}")
+            return sanitized_data
+
+        logger.warning(
+            f"Extracted date '{extracted_date_str}' is out of the 2-week range. "
+            f"Sanitizing to current system time: {fallback_date_str}"
+        )
+        sanitized_data["date_time"] = fallback_date_str
+
+    except (ValueError, TypeError) as e:
+        logger.warning(
+            f"Failed to parse extracted date '{extracted_date_str}'. "
+            f"Error: {e}. Sanitizing to current system time: {fallback_date_str}"
+        )
+        sanitized_data["date_time"] = fallback_date_str
+
+    return sanitized_data
 
 
 def preparar_mensaje_confirmacion(datos_crudos: dict) -> str:

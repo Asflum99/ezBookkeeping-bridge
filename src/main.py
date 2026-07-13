@@ -12,9 +12,10 @@ from services.ezbookkeeping_service import registrar_transaccion
 from services.groq_service import procesar_gasto_con_ia
 from services.guardian import validate_and_extract_message
 from services.telegram_service import enviar_mensaje_telegram
+from services.user_service import get_user_categories
 from utils.formateador import (
-    preparar_fecha_para_ezbookkeeping,
     preparar_mensaje_confirmacion,
+    validate_and_sanitize_voucher_data,
 )
 
 # ==========================================
@@ -122,15 +123,25 @@ async def telegram_webhook(payload: TelegramUpdate):
     try:
         ruta_foto_local = descargar_foto_telegram(TELEGRAM_TOKEN_BOT, file_id)
 
-        datos_crudos_ia = procesar_gasto_con_ia(ruta_foto_local)
-        datos_limpios = preparar_fecha_para_ezbookkeeping(datos_crudos_ia)
+        user_categories = get_user_categories(user_id)
+        if not user_categories:
+            logger.error(
+                f"Cannot process voucher: No categories found for user {user_id}"
+            )
+            return {
+                "status": "success",
+                "detail": "Failed to retrieve user categories.",
+            }
 
-        medio_pago_ia: str = datos_limpios.get("medio_pago", "")
+        raw_llm_data = procesar_gasto_con_ia(ruta_foto_local, user_categories)
+        sanitized_data = validate_and_sanitize_voucher_data(raw_llm_data)
+
+        medio_pago_ia: str = sanitized_data.get("medio_pago", "")
         cuentas_usuario: dict = user_info.get("cuentas", {})
         source_account_id: str = cuentas_usuario.get(medio_pago_ia, "")
 
         # Guarda el texto original entregado por la IA (ej: "Comida")
-        categoria_texto_original = datos_limpios.get("categoria", "")
+        categoria_texto_original = sanitized_data.get("categoria", "")
         mapa_categorias_usuario = user_info.get("categorias", {})
 
         # Busca el ID numérico correspondiente en el JSON del usuario
@@ -154,15 +165,15 @@ async def telegram_webhook(payload: TelegramUpdate):
             }
 
         # Reemplaza el texto por el ID numérico final antes de enviar a la API
-        datos_limpios["categoria"] = id_categoria_final
+        sanitized_data["categoria"] = id_categoria_final
 
         gasto_guardado = registrar_transaccion(
-            datos_limpios, user_info, source_account_id
+            sanitized_data, user_info, source_account_id
         )
 
         # Reemplaza el campo con el nombre bonito original para armar la confirmación de Telegram
-        datos_crudos_ia["categoria"] = f"📝 {categoria_texto_original}"
-        mensaje_para_usuario = preparar_mensaje_confirmacion(datos_crudos_ia)
+        raw_llm_data["categoria"] = f"📝 {categoria_texto_original}"
+        mensaje_para_usuario = preparar_mensaje_confirmacion(raw_llm_data)
 
         if gasto_guardado:
             enviar_mensaje_telegram(

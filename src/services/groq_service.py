@@ -8,16 +8,19 @@ from groq import Groq
 logger = logging.getLogger("bot_finanzas")
 
 
-def _cargar_prompt_sistema(nombre_archivo: str) -> str:
-    """Lee el contenido de un archivo de prompt en la carpeta prompts/"""
-    ruta_base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ruta_prompt = os.path.join(ruta_base, "config/prompts", nombre_archivo)
+def load_system_prompt(user_categories: list[str]) -> str:
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    prompt_path = os.path.join(current_dir, "../templates/voucher_prompt.md")
 
-    with open(ruta_prompt, "r", encoding="utf-8") as archivo:
-        return archivo.read()
+    with open(prompt_path, "r", encoding="utf-8") as file:
+        prompt_template = file.read()
+
+    formatted_categories = "\n".join(f"- {cat}" for cat in user_categories)
+
+    return prompt_template.format(categories_list=formatted_categories)
 
 
-def procesar_gasto_con_ia(ruta_foto_local: str) -> dict:
+def procesar_gasto_con_ia(ruta_foto_local: str, user_categories: list[str]) -> dict:
     logger.info(
         f"Iniciando procesamiento de voucher con IA (Archivo: {os.path.basename(ruta_foto_local)})"
     )
@@ -27,7 +30,7 @@ def procesar_gasto_con_ia(ruta_foto_local: str) -> dict:
     client = Groq()
 
     try:
-        system_prompt = _cargar_prompt_sistema("sistema_extractor.md")
+        system_prompt = load_system_prompt(user_categories)
 
         logger.debug("Enviando petición a la API de Groq...")
         chat_completion = client.chat.completions.create(
