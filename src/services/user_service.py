@@ -37,3 +37,24 @@ def get_user_categories(telegram_id: int) -> list[str]:
     except (json.JSONDecodeError, IOError) as e:
         logger.error(f"Failed to read or parse accounts JSON file: {e}")
         return []
+
+
+def get_user_configuration(user_id: int) -> dict[str, Any]:
+    """
+    Retrieves the complete configuration dictionary for a specific user from the JSON file.
+    Returns an empty dict if the user is not found or if an error occurs.
+    """
+    if not os.path.exists(ACCOUNTS_JSON_PATH):
+        logger.error(f"Accounts file not found at path: {ACCOUNTS_JSON_PATH}")
+        return {}
+
+    try:
+        with open(ACCOUNTS_JSON_PATH, "r", encoding="utf-8") as file:
+            accounts_data = json.load(file)
+            user_config = accounts_data.get(str(user_id))
+
+            return user_config if user_config is not None else {}
+
+    except (json.JSONDecodeError, IOError) as e:
+        logger.error(f"Failed to read or parse accounts JSON file: {e}")
+        return {}

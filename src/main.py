@@ -5,21 +5,21 @@ from typing import List
 from fastapi import FastAPI, HTTPException
 
 from config.logger import logger
-from core.file_manager import borrar_archivo_local, descargar_foto_telegram
-from core.usuarios import verificar_registro_usuario
+from core.file_manager import delete_local_file, download_telegram_photo
 from schemas import TelegramMessage, TelegramPhotoSize, TelegramUpdate
-from services.ezbookkeeping_service import registrar_transaccion
-from services.groq_service import procesar_gasto_con_ia
+from services.auth_service import verify_user_registration
+from services.ezbookkeeping_service import register_transaction
+from services.groq_service import process_expense_with_ai
 from services.guardian import validate_and_extract_message
-from services.telegram_service import enviar_mensaje_telegram
+from services.telegram_service import send_telegram_message
 from services.user_service import get_user_categories
-from utils.formateador import (
-    preparar_mensaje_confirmacion,
+from utils.formatter import (
+    prepare_confirmation_message,
     validate_and_sanitize_voucher_data,
 )
 
 # ==========================================
-# CONFIGURACIONES GLOBALES E INICIALIZACIÓN
+# Configuraciones globales
 # ==========================================
 
 telegram_bot_token_raw = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -31,49 +31,57 @@ if not telegram_bot_token_raw or not usuarios_raw:
     )
     sys.exit(1)
 
-TELEGRAM_TOKEN_BOT = telegram_bot_token_raw
-USUARIOS_PERMITIDOS = set(
-    int(uid.strip()) for uid in usuarios_raw.split(",")
-)  # TODO: Preguntar por qué funciona
+TELEGRAM_BOT_TOKEN = telegram_bot_token_raw
+ALLOWED_USERS = set(int(uid.strip()) for uid in usuarios_raw.split(","))
 
 app = FastAPI()
 
 # ==========================================
-# Functions auxiliares
+# Funciones auxiliares
 # ==========================================
 
 
-def validar_acceso_y_contenido(
+def validate_access_and_content(
     message: TelegramMessage, user_id: int, chat_id: int
 ) -> bool:
     """
-    Valida si el usuario está en la lista blanca y si envió una foto.
-    Devuelve True si todo está correcto, False si debe detenerse el flujo.
+    Validates if the user is in the whitelist and has sent a photo.
+    Returns True if valid, False if the flow should be halted.
     """
-    if user_id not in USUARIOS_PERMITIDOS:
-        logger.warning(
-            f"🚫 Intento de acceso denegado para el ID de Telegram: {user_id}"
-        )
-        raise HTTPException(status_code=403, detail="Acceso no autorizado")
+    if user_id not in ALLOWED_USERS:
+        logger.warning(f"🚫 Access denied attempt for Telegram ID: {user_id}")
+        raise HTTPException(status_code=403, detail="Unauthorized access")
 
     if not message.photo:
-        logger.info(f"💡 El usuario {user_id} envió algo que no es una foto.")
-        enviar_mensaje_telegram(
-            TELEGRAM_TOKEN_BOT,
-            chat_id=chat_id,
-            texto="Por ahora solo puedo recibir fotos de vouchers o boletas para registrar tus gastos. 📸",
+        logger.info(f"💡 User {user_id} sent a message without photos.")
+
+        send_telegram_message(
+            TELEGRAM_BOT_TOKEN,
+            chat_id,
+            "Por ahora solo puedo recibir fotos de vouchers o boletas para registrar tus gastos. 📸",
         )
         return False
 
     return True
 
 
-def obtener_foto_optima_id(photo: List[TelegramPhotoSize]) -> str:
-    """Extrae el file_id de la imagen con mayor resolución."""
-    fotos = photo
-    foto_optima = fotos[-1]  # El último elemento siempre es el más grande
-    file_id = foto_optima.file_id
-    logger.debug(f"Foto óptima detectada a procesar: {file_id}")
+def get_optimal_photo_id(photo_sizes: List[TelegramPhotoSize]) -> str:
+    """
+    Extracts the file_id of the highest resolution photo from the list.
+    Telegram always appends the largest image size at the end of the array.
+    """
+    if not photo_sizes:
+        logger.warning("Empty photo sizes list received. Cannot extract file_id.")
+        raise ValueError("Photo sizes list is empty.")
+
+    # Grab the last element (highest resolution)
+    optimal_photo = photo_sizes[-1]
+    file_id = optimal_photo.file_id
+
+    logger.debug(
+        f"Optimal photo detected for processing: {file_id} "
+        f"({optimal_photo.width}x{optimal_photo.height}px)"
+    )
     return file_id
 
 
@@ -98,7 +106,7 @@ async def telegram_webhook(payload: TelegramUpdate):
     chat_id = message.chat.id
     user_id = message.from_user.id
 
-    if not validar_acceso_y_contenido(message, user_id, chat_id):
+    if not validate_access_and_content(message, user_id, chat_id):
         return {
             "status": "success",
             "detail": "Contenido no soportado o flujo controlado.",
@@ -113,15 +121,15 @@ async def telegram_webhook(payload: TelegramUpdate):
             "detail": "No hay imágenes en el mensaje de Telegram.",
         }
 
-    file_id = obtener_foto_optima_id(message.photo)
+    file_id = get_optimal_photo_id(message.photo)
 
-    user_info = verificar_registro_usuario(TELEGRAM_TOKEN_BOT, user_id, chat_id)
+    user_info = verify_user_registration(TELEGRAM_BOT_TOKEN, user_id, chat_id)
     if not user_info:
         return
 
-    ruta_foto_local = None
+    local_photo_path = None
     try:
-        ruta_foto_local = descargar_foto_telegram(TELEGRAM_TOKEN_BOT, file_id)
+        local_photo_path = await download_telegram_photo(TELEGRAM_BOT_TOKEN, file_id)
 
         user_categories = get_user_categories(user_id)
         if not user_categories:
@@ -133,57 +141,20 @@ async def telegram_webhook(payload: TelegramUpdate):
                 "detail": "Failed to retrieve user categories.",
             }
 
-        raw_llm_data = procesar_gasto_con_ia(ruta_foto_local, user_categories)
+        raw_llm_data = process_expense_with_ai(local_photo_path, user_categories)
         sanitized_data = validate_and_sanitize_voucher_data(raw_llm_data)
 
-        medio_pago_ia: str = sanitized_data.get("medio_pago", "")
-        cuentas_usuario: dict = user_info.get("cuentas", {})
-        source_account_id: str = cuentas_usuario.get(medio_pago_ia, "")
+        transaction_registered = await register_transaction(sanitized_data, user_info)
 
-        # Guarda el texto original entregado por la IA (ej: "Comida")
-        categoria_texto_original = sanitized_data.get("categoria", "")
-        mapa_categorias_usuario = user_info.get("categorias", {})
-
-        # Busca el ID numérico correspondiente en el JSON del usuario
-        id_categoria_final = mapa_categorias_usuario.get(
-            categoria_texto_original, mapa_categorias_usuario.get("Otros Gastos")
-        )
-
-        if not id_categoria_final:
-            logger.error(
-                f"❌ No se pudo determinar un ID de categoría válido para el usuario {user_id}. "
-                f"Texto IA: '{categoria_texto_original}'. Asegúrate de que 'Otros Gastos' exista en cuentas.json."
-            )
-            enviar_mensaje_telegram(
-                TELEGRAM_TOKEN_BOT,
+        if transaction_registered:
+            send_telegram_message(
+                TELEGRAM_BOT_TOKEN,
                 chat_id,
-                "⚠️ No pude clasificar este gasto. Por favor, verifica la categoría en el voucher.",
-            )
-            return {
-                "status": "error",
-                "detail": "Categoría no encontrada o no mapeada.",
-            }
-
-        # Reemplaza el texto por el ID numérico final antes de enviar a la API
-        sanitized_data["categoria"] = id_categoria_final
-
-        gasto_guardado = registrar_transaccion(
-            sanitized_data, user_info, source_account_id
-        )
-
-        # Reemplaza el campo con el nombre bonito original para armar la confirmación de Telegram
-        raw_llm_data["categoria"] = f"📝 {categoria_texto_original}"
-        mensaje_para_usuario = preparar_mensaje_confirmacion(raw_llm_data)
-
-        if gasto_guardado:
-            enviar_mensaje_telegram(
-                TELEGRAM_TOKEN_BOT,
-                chat_id,
-                mensaje_para_usuario,
+                prepare_confirmation_message(sanitized_data),
             )
         else:
-            enviar_mensaje_telegram(
-                TELEGRAM_TOKEN_BOT,
+            send_telegram_message(
+                TELEGRAM_BOT_TOKEN,
                 chat_id,
                 "⚠️ Error al guardar en tu cuenta de ezBookkeeping.",
             )
@@ -192,21 +163,21 @@ async def telegram_webhook(payload: TelegramUpdate):
         logger.critical(
             "⚠️ Notificando al usuario sobre fallo del sistema interno (Falta de Prompt)."
         )
-        enviar_mensaje_telegram(
-            TELEGRAM_TOKEN_BOT,
-            chat_id=chat_id,
-            texto="⚙️ Lo siento, nuestro sistema interno está experimentando fallas técnicas en este momento. Por favor, vuelve a intentarlo más tarde. 🙏",
+        send_telegram_message(
+            TELEGRAM_BOT_TOKEN,
+            chat_id,
+            "⚙️ Lo siento, nuestro sistema interno está experimentando fallas técnicas en este momento. Por favor, vuelve a intentarlo más tarde. 🙏",
         )
 
     except Exception:
         logger.critical("❌ Error durante el procesamiento general:")
-        enviar_mensaje_telegram(
-            TELEGRAM_TOKEN_BOT,
-            chat_id=chat_id,
-            texto="Hubo un problema al procesar la imagen de tu voucher. Inténtalo de nuevo. 😞",
+        send_telegram_message(
+            TELEGRAM_BOT_TOKEN,
+            chat_id,
+            "Hubo un problema al procesar la imagen de tu voucher. Inténtalo de nuevo. 😞",
         )
 
     finally:
-        if ruta_foto_local:
+        if local_photo_path:
             logger.info("Iniciando proceso de borrado de la foto del voucher")
-            borrar_archivo_local(ruta_foto_local)
+            delete_local_file(local_photo_path)

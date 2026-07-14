@@ -1,12 +1,11 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Any
-from zoneinfo import ZoneInfo
 
 logger = logging.getLogger("bot_finanzas")
 
 
-def validate_and_sanitize_voucher_data(raw_data: dict[str, Any]) -> dict[str, Any]:
+def validate_and_sanitize_voucher_data(raw_llm_data: dict[str, Any]) -> dict[str, Any]:
     """
     Validates the 'date_time' field inside the LLM raw data dictionary.
     If the date is invalid, out of the 2-week range, or missing, it falls back
@@ -14,7 +13,7 @@ def validate_and_sanitize_voucher_data(raw_data: dict[str, Any]) -> dict[str, An
 
     Returns the updated dictionary with the sanitized ISO date string.
     """
-    sanitized_data = raw_data.copy()
+    sanitized_data = raw_llm_data.copy()
 
     now = datetime.now()
     two_weeks_ago = now - timedelta(days=14)
@@ -52,46 +51,45 @@ def validate_and_sanitize_voucher_data(raw_data: dict[str, Any]) -> dict[str, An
     return sanitized_data
 
 
-def preparar_mensaje_confirmacion(datos_crudos: dict) -> str:
+def prepare_confirmation_message(sanitized_data: dict[str, Any]) -> str:
     """
-    Toma los datos originales de la IA (legibles) y arma un mensaje
-    estético y amigable para el usuario en Telegram.
+    Takes the sanitized LLM data and builds an aesthetically pleasing,
+    friendly confirmation message in Spanish for the Telegram user.
     """
-    logger.info("Iniciando limpieza de datos para enviárselo al usuario por Telegram")
+    logger.info("Building confirmation message for Telegram UI.")
 
-    monto = datos_crudos.get("monto", "0.00")
-    descripcion = datos_crudos.get("comentario", "Desconocido")
-    fecha = datos_crudos.get("fecha_hora")
+    amount = sanitized_data.get("amount", "0.00")  # TODO: Revisar
+    comment = sanitized_data.get("comment", "Desconocido")
+    date_time_str = sanitized_data.get("date_time")
 
     try:
-        if fecha:
-            timestamp_segundos = float(fecha)
-            fecha_objeto = datetime.fromtimestamp(
-                timestamp_segundos, tz=ZoneInfo("America/Lima")
-            )
-            fecha_bonita = fecha_objeto.strftime("%d-%m-%Y %I:%M %p").lower()
+        if date_time_str:
+            parsed_date = datetime.strptime(date_time_str, "%Y-%m-%d %H:%M:%S")
+            formatted_date = parsed_date.strftime("%d-%m-%Y %I:%M %p")
         else:
-            logger.warning("No se encontró fecha, usando valor placeholder")
-            fecha_bonita = "No detectada"
-    except Exception as e:
-        logger.warning(f"⚠️ No se pudo formatear el timestamp para el usuario: {e}")
-        fecha_bonita = "Formato inválido"
+            logger.warning("No date_time found in sanitized data. Using placeholder.")
+            formatted_date = "No detectada"
+    except (ValueError, TypeError) as e:
+        logger.warning(f"⚠️ Failed to format date for user message: {e}")
+        formatted_date = "Formato inválido"
 
-    medio_pago_raw = datos_crudos.get("medio_pago", "")
-    medios_traducidos = {
+    payment_method_raw = sanitized_data.get("payment_method", "")
+    translated_payment_methods = {
         "billetera_digital": "📱 Billetera Digital (Yape/Plin/Débito)",
         "tarjeta_credito": "💳 Tarjeta de Crédito",
     }
-    medio_pago_bonito = medios_traducidos.get(medio_pago_raw, "❓ Desconocido")
-
-    categoria_bonita = datos_crudos.get("categoria", "❓ Desconocida")
-
-    mensaje = (
-        f"✅ ¡Gasto registrado con éxito!\n\n"
-        f"💰 Monto: S/. {monto}\n"
-        f"📝 Descripción: {descripcion}\n"
-        f"📅 Fecha: {fecha_bonita}\n"
-        f"💳 Método: {medio_pago_bonito}\n"
-        f"🏷️ Categoría: {categoria_bonita}"
+    payment_method_friendly = translated_payment_methods.get(
+        payment_method_raw, "❓ Desconocido"
     )
-    return mensaje
+
+    category_name = sanitized_data.get("category", "❓ Desconocida")
+
+    message = (
+        f"✅ ¡Gasto registrado con éxito!\n\n"
+        f"💰 Monto: S/. {amount}\n"
+        f"📝 Descripción: {comment}\n"
+        f"📅 Fecha: {formatted_date}\n"
+        f"💳 Método: {payment_method_friendly}\n"
+        f"🏷️ Categoría: {category_name}"
+    )
+    return message

@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 import os
+from typing import Any
 
 from groq import Groq
 
@@ -20,19 +21,30 @@ def load_system_prompt(user_categories: list[str]) -> str:
     return prompt_template.format(categories_list=formatted_categories)
 
 
-def procesar_gasto_con_ia(ruta_foto_local: str, user_categories: list[str]) -> dict:
-    logger.info(
-        f"Iniciando procesamiento de voucher con IA (Archivo: {os.path.basename(ruta_foto_local)})"
-    )
-    with open(ruta_foto_local, "rb") as image_file:
-        imagen_base64 = base64.b64encode(image_file.read()).decode("utf-8")
+def process_expense_with_ai(
+    local_photo_path: str, user_categories: list[str]
+) -> dict[str, Any]:
+    """
+    Encodes the local voucher image to base64, sends it to the Groq Vision model
+    along with the dynamic system prompt, and returns the parsed JSON extraction.
+    """
+    filename = os.path.basename(local_photo_path)
+    logger.info(f"Starting voucher processing with AI (File: {filename})")
+
+    try:
+        with open(local_photo_path, "rb") as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+    except FileNotFoundError:
+        logger.error(f"❌ Local voucher file not found at: {local_photo_path}")
+        raise
 
     client = Groq()
 
     try:
         system_prompt = load_system_prompt(user_categories)
 
-        logger.debug("Enviando petición a la API de Groq...")
+        logger.debug("Sending payload to Groq Vision API...")
+
         chat_completion = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -41,12 +53,12 @@ def procesar_gasto_con_ia(ruta_foto_local: str, user_categories: list[str]) -> d
                     "content": [
                         {
                             "type": "text",
-                            "text": "Extrae los datos de este voucher de pago.",
+                            "text": "Extract the structured data from this payment voucher.",
                         },
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:image/jpeg;base64,{imagen_base64}"
+                                "url": f"data:image/jpeg;base64,{base64_image}"
                             },
                         },
                     ],
@@ -56,29 +68,27 @@ def procesar_gasto_con_ia(ruta_foto_local: str, user_categories: list[str]) -> d
             response_format={"type": "json_object"},
         )
 
-        if datos_str := chat_completion.choices[0].message.content:
-            datos_dict: dict = json.loads(datos_str)
+        response_content = chat_completion.choices[0].message.content
 
-            logger.info("Groq extrajo los datos del voucher con éxito.")
+        if response_content:
+            parsed_data: dict[str, Any] = json.loads(response_content)
+
+            logger.info("Successfully extracted voucher data from Groq API.")
             logger.debug(
-                f"JSON crudo devuelto por la IA:\n{json.dumps(datos_dict, indent=2)}"
+                f"Raw JSON returned by LLM:\n{json.dumps(parsed_data, indent=2)}"
             )
-
-            return datos_dict
+            return parsed_data
         else:
-            raise ValueError(
-                "La API de Groq devolvió una respuesta con contenido vacío."
-            )
+            raise ValueError("Groq API returned an empty message content.")
 
     except FileNotFoundError:
         logger.exception(
-            "❌ ERROR CRÍTICO DE INFRAESTRUCTURA: No se encontró el archivo de prompt de la IA."
+            "❌ CRITICAL INFRASTRUCTURE ERROR: System prompt Markdown template not found."
         )
         raise
-    except ValueError:
-        logger.exception("❌ La IA no devolvió datos legibles.")
-        raise
-
-    except Exception:
-        logger.exception("❌ Error general al conectar con Groq")
+    except json.JSONDecodeError as e:
+        logger.exception(f"❌ Failed to decode JSON from LLM response. Error: {e}")
+        raise ValueError("The IA did not return a valid JSON structure.") from e
+    except Exception as e:
+        logger.exception(f"❌ General failure while connecting to Groq API: {e}")
         raise

@@ -1,6 +1,9 @@
 import logging
 import os
 import sys
+from datetime import datetime
+from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -14,13 +17,52 @@ if not EZBOOKKEEPING_URL:
     sys.exit(1)
 
 
-def registrar_transaccion(
-    datos_gasto: dict, user_info: dict, source_account_id: str
+async def register_transaction(
+    sanitized_data: dict[str, Any], user_info: dict[str, Any]
 ) -> bool:
     """
-    Envía el gasto usando el token específico del usuario que mandó el voucher.
+    Submits the transaction to the ezBookkeeping API using the user's specific token.
+    Resolves category IDs and source account IDs dynamically from user_info.
     """
+    logger.info("Starting transaction registration in ezBookkeeping.")
     url = f"{EZBOOKKEEPING_URL}/api/v1/transactions/add.json"
+
+    category_name = sanitized_data.get("category")
+    user_categories = user_info.get("categorias", {})
+
+    category_id = user_categories.get(category_name)
+    if not category_id:
+        logger.error(
+            f"❌ Failed to resolve category ID for name: '{category_name}'. "
+            f"Allowed user categories: {list(user_categories.keys())}"
+        )
+        return False
+
+    payment_method = sanitized_data.get("payment_method")
+    user_accounts = user_info.get("cuentas", {})
+
+    source_account_id = user_accounts.get(payment_method)
+    if not source_account_id:
+        logger.error(
+            f"❌ Failed to resolve source account ID for payment method: '{payment_method}'. "
+            f"Available user accounts: {list(user_accounts.keys())}"
+        )
+        return False
+
+    amount_cents = int(round(float(sanitized_data["amount"]) * 100))
+
+    iso_time_str = sanitized_data["date_time"]
+    try:
+        parsed_datetime = datetime.strptime(iso_time_str, "%Y-%m-%d %H:%M:%S").replace(
+            tzinfo=ZoneInfo("America/Lima")
+        )
+        unix_timestamp = int(parsed_datetime.timestamp())
+
+    except (ValueError, TypeError) as e:
+        logger.error(
+            f"❌ Failed to convert date '{iso_time_str}' to Unix timestamp: {e}. Falling back to now."
+        )
+        unix_timestamp = int(datetime.now(ZoneInfo("America/Lima")).timestamp())
 
     headers = {
         "Authorization": f"Bearer {user_info['ez_token']}",
@@ -29,50 +71,48 @@ def registrar_transaccion(
         "X-Timezone-Offset": "-300",
     }
 
-    monto_centimos_entero = int(round(datos_gasto["monto"] * 100))
-
     body = {
         "type": 3,
-        "categoryId": datos_gasto["categoria"],
-        "sourceAmount": monto_centimos_entero,
-        "time": datos_gasto["fecha_hora"],
-        "comment": datos_gasto["comentario"],
+        "categoryId": category_id,
+        "sourceAmount": amount_cents,
+        "time": unix_timestamp,
+        "comment": sanitized_data["comment"],
         "sourceAccountId": source_account_id,
         "utcOffset": -300,
     }
 
-    logger.debug(
-        f"Iniciando registro de transacción con los siguientes valores:\n{body}"
-    )
+    logger.debug(f"Submitting transaction with payload: {body}")
 
     try:
-        with httpx.Client() as client:
-            respuesta = client.post(url, json=body, headers=headers, timeout=10.0)
-            logger.debug(f"Respuesta de la solicitud POST: {respuesta.status_code}")
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=body, headers=headers, timeout=10.0)
+            logger.debug(
+                f"ezBookkeeping API responded with status code: {response.status_code}"
+            )
 
-            if respuesta.status_code == 200:
+            if response.status_code == 200:
                 try:
-                    res_json = respuesta.json()
+                    res_json = response.json()
                     if res_json.get("success"):
                         logger.info(
-                            "¡Transacción registrada exitosamente en ezBookkeeping!"
+                            "🎉 Transaction successfully registered in ezBookkeeping!"
                         )
                         return True
                 except ValueError:
                     logger.error(
-                        "❌ La API devolvió un estado 200 pero el cuerpo no era un JSON válido."
+                        "❌ ezBookkeeping returned 200 OK but body is not a valid JSON."
                     )
 
             logger.error(
-                f"❌ Error API ezBookkeeping. Código: {respuesta.status_code}. Respuesta: {respuesta.text}"
+                f"❌ ezBookkeeping API Error. Status: {response.status_code}. Response: {response.text}"
             )
             return False
 
-    except httpx.RequestError:
+    except httpx.RequestError as e:
         logger.exception(
-            "❌ Error de red o Timeout al intentar conectar con ezBookkeeping"
+            f"❌ Network or Timeout error connecting to ezBookkeeping: {e}"
         )
         return False
-    except Exception:
-        logger.exception("❌ Error inesperado en la función registrar_transaccion")
+    except Exception as e:
+        logger.exception(f"❌ Unexpected error in register_transaction: {e}")
         return False

@@ -8,55 +8,60 @@ TMP_DIR = "tmp"
 logger = logging.getLogger("bot_finanzas")
 
 
-def asegurar_carpeta_temporal():
-    """Crea la carpeta tmp si no existe"""
+def ensure_tmp_directory() -> None:
+    """
+    Creates the temporary directory if it does not exist.
+    """
     if not os.path.exists(TMP_DIR):
         os.makedirs(TMP_DIR)
-        logger.info(f"📁 Carpeta temporal '{TMP_DIR}' creada.")
+        logger.info(f"📁 Temporary directory '{TMP_DIR}' created.")
 
 
-def descargar_foto_telegram(telegram_token_bot: str, file_id: str) -> str:
+async def download_telegram_photo(telegram_bot_token: str, file_id: str) -> str:
     """
-    Pide la ruta a Telegram, descarga la foto en tmp/ y retorna la ruta local.
+    Retrieves the file path from Telegram, downloads the photo to the tmp/ folder,
+    and returns the local file path.
     """
-    asegurar_carpeta_temporal()
+    ensure_tmp_directory()
 
-    url_info = (
-        f"https://api.telegram.org/bot{telegram_token_bot}/getFile?file_id={file_id}"
+    info_url = (
+        f"https://api.telegram.org/bot{telegram_bot_token}/getFile?file_id={file_id}"
     )
 
-    with httpx.Client() as client:
-        response = client.get(url_info)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(info_url)
         response.raise_for_status()
-        datos_archivo = response.json()
+        file_data = response.json()
 
-        if not datos_archivo.get("ok"):
-            raise Exception("Telegram no pudo procesar el file_id")
+        if not file_data.get("ok"):
+            logger.error(f"Telegram API failed to process file_id: {file_id}")
+            raise RuntimeError("Telegram was unable to process the file_id.")
 
-        file_path = datos_archivo["result"]["file_path"]
-
-        url_descarga = (
-            f"https://api.telegram.org/file/bot{telegram_token_bot}/{file_path}"
+        file_path = file_data["result"]["file_path"]
+        download_url = (
+            f"https://api.telegram.org/file/bot{telegram_bot_token}/{file_path}"
         )
 
-        extension = os.path.splitext(file_path)[1]
-        ruta_local_destino = os.path.join(TMP_DIR, f"{file_id}{extension}")
+        file_extension = os.path.splitext(file_path)[1]
+        local_destination = os.path.join(TMP_DIR, f"{file_id}{file_extension}")
 
-        with client.stream("GET", url_descarga) as stream_response:
+        async with client.stream("GET", download_url) as stream_response:
             stream_response.raise_for_status()
-            with open(ruta_local_destino, "wb") as f:
-                for chunk in stream_response.iter_bytes():
+            with open(local_destination, "wb") as f:
+                async for chunk in stream_response.aiter_bytes():
                     f.write(chunk)
 
-        logger.info(f"⬇️ Archivo guardado localmente en: {ruta_local_destino}")
-        return ruta_local_destino
+        logger.info(f"⬇️ File downloaded successfully to: {local_destination}")
+        return local_destination
 
 
-def borrar_archivo_local(ruta_archivo: str):
-    """Elimina el archivo temporal de forma segura"""
+def delete_local_file(file_path: str) -> None:
+    """
+    Safely deletes the specified local file if it exists.
+    """
     try:
-        if os.path.exists(ruta_archivo):
-            os.remove(ruta_archivo)
-            logger.info(f"🗑️ Archivo temporal eliminado: {ruta_archivo}")
-    except Exception:
-        logger.exception(f"⚠️ No se pudo borrar el archivo {ruta_archivo}:")
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            logger.info(f"🗑️ Temporary file deleted: {file_path}")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to delete temporary file {file_path}. Error: {e}")
