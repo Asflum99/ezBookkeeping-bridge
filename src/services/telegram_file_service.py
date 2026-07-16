@@ -1,11 +1,11 @@
-import logging
 import os
 
 import httpx
 
-TMP_DIR = "tmp"
+from config.logger import logger
 
-logger = logging.getLogger("bot_finanzas")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TMP_DIR = os.path.join(PROJECT_ROOT, "tmp")
 
 
 def ensure_tmp_directory() -> None:

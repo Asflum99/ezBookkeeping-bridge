@@ -1,24 +1,30 @@
 import base64
 import json
-import logging
 import os
 from typing import Any
 
 from groq import Groq
 
-logger = logging.getLogger("bot_finanzas")
+from config.logger import logger
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_PROMPT_TEMPLATE_PATH = os.path.join(PROJECT_ROOT, "templates", "voucher_prompt.md")
+
+try:
+    with open(_PROMPT_TEMPLATE_PATH, "r", encoding="utf-8") as _f:
+        _SYSTEM_PROMPT_TEMPLATE = _f.read()
+except FileNotFoundError:
+    logger.critical(
+        f"❌ CRITICAL: System prompt template not found at {_PROMPT_TEMPLATE_PATH}. "
+        "The application cannot start without it."
+    )
+    raise
 
 
-def load_system_prompt(user_categories: list[str]) -> str:
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    prompt_path = os.path.join(current_dir, "../templates/voucher_prompt.md")
-
-    with open(prompt_path, "r", encoding="utf-8") as file:
-        prompt_template = file.read()
-
+def build_system_prompt(user_categories: list[str]) -> str:
+    """Format the cached prompt template with user categories."""
     formatted_categories = "\n".join(f"- {cat}" for cat in user_categories)
-
-    return prompt_template.format(categories_list=formatted_categories)
+    return _SYSTEM_PROMPT_TEMPLATE.format(categories_list=formatted_categories)
 
 
 def process_expense_with_ai(
@@ -41,7 +47,7 @@ def process_expense_with_ai(
     client = Groq()
 
     try:
-        system_prompt = load_system_prompt(user_categories)
+        system_prompt = build_system_prompt(user_categories)
 
         logger.debug("Sending payload to Groq Vision API...")
 
@@ -81,11 +87,6 @@ def process_expense_with_ai(
         else:
             raise ValueError("Groq API returned an empty message content.")
 
-    except FileNotFoundError:
-        logger.exception(
-            "❌ CRITICAL INFRASTRUCTURE ERROR: System prompt Markdown template not found."
-        )
-        raise
     except json.JSONDecodeError as e:
         logger.exception(f"❌ Failed to decode JSON from LLM response. Error: {e}")
         raise ValueError("The IA did not return a valid JSON structure.") from e

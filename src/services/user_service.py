@@ -5,7 +5,8 @@ from typing import Any
 from config.logger import logger
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-ACCOUNTS_JSON_PATH = os.path.join(CURRENT_DIR, "../cuentas.json")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(CURRENT_DIR))
+ACCOUNTS_JSON_PATH = os.path.join(PROJECT_ROOT, "data", "cuentas.json")
 
 
 def get_user_categories(telegram_id: int) -> list[str]:
@@ -26,8 +27,8 @@ def get_user_categories(telegram_id: int) -> list[str]:
             logger.warning(f"User {telegram_id} config not found in JSON storage.")
             return []
 
-        # Extraemos solo las llaves (nombres de las categorías) del diccionario de mapeo
-        # Ej: {"Comida": "382610...", "Transporte": "382610..."} -> ["Comida", "Transporte"]
+        # Extract only the keys (category names) from the mapping dict
+        # E.g. {"Comida": "382610...", "Transporte": "382610..."} -> ["Comida", "Transporte"]
         categories = list(user_config.get("categorias", {}).keys())
         logger.debug(
             f"Successfully retrieved {len(categories)} categories for user {telegram_id}"

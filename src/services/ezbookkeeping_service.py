@@ -1,4 +1,3 @@
-import logging
 import os
 import sys
 from datetime import datetime
@@ -7,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-logger = logging.getLogger("bot_finanzas")
+from config.logger import logger
 
 EZBOOKKEEPING_URL = os.getenv("EZBOOKKEEPING_URL")
 if not EZBOOKKEEPING_URL:

@@ -1,8 +1,7 @@
-import logging
 from datetime import datetime, timedelta
 from typing import Any
 
-logger = logging.getLogger("bot_finanzas")
+from config.logger import logger
 
 
 def validate_and_sanitize_voucher_data(raw_llm_data: dict[str, Any]) -> dict[str, Any]:

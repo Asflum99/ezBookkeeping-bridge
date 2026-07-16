@@ -4,24 +4,24 @@ from logging.handlers import RotatingFileHandler
 
 import colorlog
 
-RUTA_RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CARPETA_LOGS = os.path.join(RUTA_RAIZ, "logs")
-os.makedirs(CARPETA_LOGS, exist_ok=True)
-ARCHIVO_LOG = os.path.join(CARPETA_LOGS, "bot.log")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
+os.makedirs(LOGS_DIR, exist_ok=True)
+LOG_FILE = os.path.join(LOGS_DIR, "bot.log")
 
 LOG_LEVEL_STR = os.getenv("LOG_LEVEL", "INFO").upper().strip()
-NIVELES = {
+LOG_LEVELS = {
     "DEBUG": logging.DEBUG,
     "INFO": logging.INFO,
     "WARNING": logging.WARNING,
     "ERROR": logging.ERROR,
     "CRITICAL": logging.CRITICAL,
 }
-LOG_LEVEL_NUMERIC = NIVELES.get(LOG_LEVEL_STR, logging.INFO)
+LOG_LEVEL_NUMERIC = LOG_LEVELS.get(LOG_LEVEL_STR, logging.INFO)
 
-# Configuración de rotación y formato para el archivo log
+# Log file rotation config
 file_handler = RotatingFileHandler(
-    ARCHIVO_LOG, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
+    LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
 )
 file_formatter = logging.Formatter(
     "[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
@@ -29,11 +29,11 @@ file_formatter = logging.Formatter(
 )
 file_handler.setFormatter(file_formatter)
 
-# Configuración para lo que se imprimirá en la terminal/consola
+# Console output config
 stream_handler = logging.StreamHandler()
 color_formatter = colorlog.ColoredFormatter(
-    # El '%(log_color)s' define dónde empieza el color según el nivel
-    # Usamos '%(purple)s' fijo para la ubicación del archivo para que se vea ordenado
+    # '%(log_color)s' sets color by level
+    # '%(purple)s' is fixed for file location to keep it tidy
     fmt="%(log_color)s[%(asctime)s] [%(levelname)s]%(reset)s %(purple)s[%(filename)s:%(lineno)d]%(reset)s %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     log_colors={
@@ -46,7 +46,7 @@ color_formatter = colorlog.ColoredFormatter(
 )
 stream_handler.setFormatter(color_formatter)
 
-# Configuración del logger
+# Logger configuration
 logging.basicConfig(
     level=LOG_LEVEL_NUMERIC,
     handlers=[file_handler, stream_handler],
