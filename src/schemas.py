@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -28,26 +28,10 @@ class TelegramMessage(BaseModel):
     chat: TelegramChat
 
     from_user: TelegramUser = Field(..., alias="from")
-    photo: Optional[List[TelegramPhotoSize]] = None
+    photo: Optional[list[TelegramPhotoSize]] = None
 
 
 class TelegramUpdate(BaseModel):
     update_id: int
 
     message: Optional[TelegramMessage] = None
-
-
-# ==========================================
-# MODELO AGNÓSTICO DE TU NEGOCIO
-# ==========================================
-
-
-class TransaccionPendiente(BaseModel):
-    """
-    El modelo ideal de tu aplicación. Cualquier plataforma (Telegram, Web, App)
-    deberá convertirse a este formato antes de procesar el gasto.
-    """
-
-    usuario_id: str
-    chat_id: int
-    archivo_id: str

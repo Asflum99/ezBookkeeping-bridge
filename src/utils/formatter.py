@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from config.logger import logger
+from config import logger
 
 
 def validate_and_sanitize_voucher_data(raw_llm_data: dict[str, Any]) -> dict[str, Any]:
@@ -55,8 +55,6 @@ def prepare_confirmation_message(sanitized_data: dict[str, Any]) -> str:
     Takes the sanitized LLM data and builds an aesthetically pleasing,
     friendly confirmation message in Spanish for the Telegram user.
     """
-    logger.info("Building confirmation message for Telegram UI.")
-
     amount = sanitized_data.get("amount", "0.00")  # TODO: Revisar
     comment = sanitized_data.get("comment", "Desconocido")
     date_time_str = sanitized_data.get("date_time")

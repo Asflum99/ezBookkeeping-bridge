@@ -2,19 +2,9 @@ import os
 
 import httpx
 
-from config.logger import logger
+from config import logger, PROJECT_ROOT
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP_DIR = os.path.join(PROJECT_ROOT, "tmp")
-
-
-def ensure_tmp_directory() -> None:
-    """
-    Creates the temporary directory if it does not exist.
-    """
-    if not os.path.exists(TMP_DIR):
-        os.makedirs(TMP_DIR)
-        logger.info(f"📁 Temporary directory '{TMP_DIR}' created.")
 
 
 async def download_telegram_photo(telegram_bot_token: str, file_id: str) -> str:
@@ -22,7 +12,7 @@ async def download_telegram_photo(telegram_bot_token: str, file_id: str) -> str:
     Retrieves the file path from Telegram, downloads the photo to the tmp/ folder,
     and returns the local file path.
     """
-    ensure_tmp_directory()
+    os.makedirs(TMP_DIR, exist_ok=True)
 
     info_url = (
         f"https://api.telegram.org/bot{telegram_bot_token}/getFile?file_id={file_id}"
