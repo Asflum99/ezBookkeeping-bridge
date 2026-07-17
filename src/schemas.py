@@ -27,7 +27,7 @@ class TelegramMessage(BaseModel):
     date: int
     chat: TelegramChat
 
-    from_user: Optional[TelegramUser] = Field(None, alias="from")
+    from_user: TelegramUser = Field(..., alias="from")
     photo: Optional[List[TelegramPhotoSize]] = None
 
 

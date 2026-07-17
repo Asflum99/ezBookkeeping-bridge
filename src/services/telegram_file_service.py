@@ -1,0 +1,67 @@
+import os
+
+import httpx
+
+from config.logger import logger
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TMP_DIR = os.path.join(PROJECT_ROOT, "tmp")
+
+
+def ensure_tmp_directory() -> None:
+    """
+    Creates the temporary directory if it does not exist.
+    """
+    if not os.path.exists(TMP_DIR):
+        os.makedirs(TMP_DIR)
+        logger.info(f"📁 Temporary directory '{TMP_DIR}' created.")
+
+
+async def download_telegram_photo(telegram_bot_token: str, file_id: str) -> str:
+    """
+    Retrieves the file path from Telegram, downloads the photo to the tmp/ folder,
+    and returns the local file path.
+    """
+    ensure_tmp_directory()
+
+    info_url = (
+        f"https://api.telegram.org/bot{telegram_bot_token}/getFile?file_id={file_id}"
+    )
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(info_url)
+        response.raise_for_status()
+        file_data = response.json()
+
+        if not file_data.get("ok"):
+            logger.error(f"Telegram API failed to process file_id: {file_id}")
+            raise RuntimeError("Telegram was unable to process the file_id.")
+
+        file_path = file_data["result"]["file_path"]
+        download_url = (
+            f"https://api.telegram.org/file/bot{telegram_bot_token}/{file_path}"
+        )
+
+        file_extension = os.path.splitext(file_path)[1]
+        local_destination = os.path.join(TMP_DIR, f"{file_id}{file_extension}")
+
+        async with client.stream("GET", download_url) as stream_response:
+            stream_response.raise_for_status()
+            with open(local_destination, "wb") as f:
+                async for chunk in stream_response.aiter_bytes():
+                    f.write(chunk)
+
+        logger.info(f"⬇️ File downloaded successfully to: {local_destination}")
+        return local_destination
+
+
+def delete_local_file(file_path: str) -> None:
+    """
+    Safely deletes the specified local file if it exists.
+    """
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            logger.info(f"🗑️ Temporary file deleted: {file_path}")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to delete temporary file {file_path}. Error: {e}")

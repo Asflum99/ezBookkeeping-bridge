@@ -22,7 +22,12 @@ __pycache__/
 Thumbs.db
 
 cuentas.json
+data/cuentas.json
 
 tmp/
 
 logs/
+
+.codegraph/
+
+.agents/
