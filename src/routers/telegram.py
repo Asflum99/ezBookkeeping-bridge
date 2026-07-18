@@ -1,16 +1,15 @@
-from typing import List
+import json
+import os
+from typing import Any
 
+import httpx
 from fastapi import APIRouter, HTTPException
 
-from config.logger import logger
-from schemas import TelegramPhotoSize, TelegramUpdate
-from services.auth_service import verify_user_registration
+from config import ACCOUNTS_JSON_PATH, logger
+from schemas import TelegramUpdate
 from services.ezbookkeeping_service import register_transaction
 from services.groq_service import process_expense_with_ai
-from services.guardian_service import validate_and_extract_message
 from services.telegram_file_service import delete_local_file, download_telegram_photo
-from services.telegram_service import send_telegram_message
-from services.user_service import get_user_categories
 from utils.formatter import (
     prepare_confirmation_message,
     validate_and_sanitize_voucher_data,
@@ -20,90 +19,79 @@ router = APIRouter()
 
 _config = {}
 
+if not os.path.exists(ACCOUNTS_JSON_PATH):
+    logger.error(f"Accounts file not found at path: {ACCOUNTS_JSON_PATH}")
+    raise FileNotFoundError
 
-def init_config(telegram_bot_token: str, allowed_users: set[int]):
-    _config["token"] = telegram_bot_token
-    _config["allowed_users"] = allowed_users
-
-
-def _get_token() -> str:
-    return _config["token"]
+with open(ACCOUNTS_JSON_PATH, "r", encoding="utf-8") as _f:
+    _ACCOUNTS_DATA: dict[str, Any] = json.load(_f)
 
 
-def _get_allowed_users() -> set[int]:
-    return _config["allowed_users"]
+def init_config():
+    _config["token"] = os.getenv("TELEGRAM_BOT_TOKEN")
+    _config["allowed_users"] = os.getenv("ALLOWED_USERS")
 
 
-def _validate_access_and_content(message, user_id: int, chat_id: int) -> bool:
-    if user_id not in _get_allowed_users():
-        logger.warning(f"🚫 Access denied attempt for Telegram ID: {user_id}")
-        raise HTTPException(status_code=403, detail="Unauthorized access")
-
-    if not message.photo:
-        logger.info(f"💡 User {user_id} sent a message without photos.")
-        send_telegram_message(
-            _get_token(),
-            chat_id,
-            "Por ahora solo puedo recibir fotos de vouchers o boletas para registrar tus gastos. 📸",
-        )
-        return False
-
-    return True
+def _get_user_configuration(user_id: int) -> dict[str, Any]:
+    """Load user config from cuentas.json. Returns {} if not found."""
+    user_config = _ACCOUNTS_DATA.get(str(user_id))
+    if not user_config:
+        logger.info(f"Unregistered user attempt: {user_id}")
+        return {}
+    logger.debug(f"Configuration recovered for Telegram ID ({user_id}): {user_config}")
+    return user_config
 
 
-def _get_optimal_photo_id(photo_sizes: List[TelegramPhotoSize]) -> str:
-    if not photo_sizes:
-        logger.warning("Empty photo sizes list received. Cannot extract file_id.")
-        raise ValueError("Photo sizes list is empty.")
-
-    optimal_photo = photo_sizes[-1]
-    file_id = optimal_photo.file_id
-
-    logger.debug(
-        f"Optimal photo detected for processing: {file_id} "
-        f"({optimal_photo.width}x{optimal_photo.height}px)"
-    )
-    return file_id
+def send_telegram_message(token: str, chat_id: int, texto: str):
+    """Send a text message to the user."""
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": texto}
+    try:
+        with httpx.Client() as client:
+            client.post(url, json=payload)
+    except Exception:
+        logger.exception("❌ Failed to send Telegram message:")
 
 
 @router.post("/webhook")
 async def telegram_webhook(payload: TelegramUpdate):
-    token = _get_token()
+    token = _config["token"]
 
-    message = validate_and_extract_message(payload)
-    if isinstance(message, dict):
-        logger.info(f"Webhook execution halted: {message.get('detail')}")
-        return message
-
-    chat_id = message.chat.id
-    user_id = message.from_user.id
-
-    if not _validate_access_and_content(message, user_id, chat_id):
+    if not payload.message or not payload.message.photo:
+        logger.info(f"Update {payload.update_id} ignored: no message or no photo.")
         return {
             "status": "success",
-            "detail": "Contenido no soportado o flujo controlado.",
+            "detail": "Update without supported content",
         }
 
-    if not message.photo:
-        logger.info(
-            f"No se pudo encontrar imágenes en el mensaje de Telegram (ID: {payload.message})"
-        )
-        return {
-            "status": "success",
-            "detail": "No hay imágenes en el mensaje de Telegram.",
-        }
+    chat_id = payload.message.chat.id
+    user_id = payload.message.from_user.id
 
-    file_id = _get_optimal_photo_id(message.photo)
+    if user_id not in _config["allowed_users"]:
+        logger.warning(f"🚫 Access denied attempt for Telegram ID: {user_id}")
+        raise HTTPException(status_code=403, detail="Unauthorized access")
 
-    user_info = verify_user_registration(token, user_id, chat_id)
+    optimal_photo = payload.message.photo[-1]
+    file_id = optimal_photo.file_id
+    logger.debug(
+        f"Optimal photo detected for processing: {file_id} "
+        f"({optimal_photo.width}x{optimal_photo.height}px)"
+    )
+
+    user_info = _get_user_configuration(user_id)
     if not user_info:
+        send_telegram_message(
+            token,
+            chat_id,
+            "⛔ No estás registrado en el sistema del bot financiero. Pídele al administrador que te agregue.",
+        )
         return
 
     local_photo_path = None
     try:
         local_photo_path = await download_telegram_photo(token, file_id)
 
-        user_categories = get_user_categories(user_id)
+        user_categories = list(user_info.get("categorias", {}).keys())
         if not user_categories:
             logger.error(
                 f"Cannot process voucher: No categories found for user {user_id}"

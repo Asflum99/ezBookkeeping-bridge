@@ -5,9 +5,8 @@ from typing import Any
 
 from groq import Groq
 
-from config.logger import logger
+from config import logger, PROJECT_ROOT
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PROMPT_TEMPLATE_PATH = os.path.join(PROJECT_ROOT, "templates", "voucher_prompt.md")
 
 try:

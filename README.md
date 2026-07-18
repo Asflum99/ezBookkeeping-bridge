@@ -1,73 +1,89 @@
-# Telegram Finance Bot 💰
+# Telegram Finance Bot
 
-Un backend ágil y seguro desarrollado con **FastAPI** y gestionado con **uv** para registrar, procesar y categorizar transacciones financieras enviadas directamente desde un bot privado de Telegram.
+Backend ligero desarrollado con **FastAPI** para registrar gastos enviados como fotos de vouchers desde un bot privado de Telegram. Usa IA (Groq Vision) para extraer datos estructurados y los registra en ezBookkeeping.
 
-## 🚀 Características Principales
+## Características
 
-* **Control de Acceso Estricto**: Filtrado a nivel de Webhook para permitir peticiones únicamente de IDs de Telegram autorizados.
-* **Arquitectura Ligera**: Construido sobre FastAPI, garantizando alto rendimiento y baja huella de memoria (ideal para despliegues en contenedores como LXC en Proxmox).
-* **Gestión de Entorno Moderna**: Utiliza `uv` para la administración de paquetes a máxima velocidad y `mise` para la gestión de versiones de runtime y automatización de tareas.
+- **Control de acceso**: Filtrado por IDs de Telegram autorizados.
+- **Extracción con IA**: Envía la foto del voucher a Groq Vision, obtiene categoría, monto, fecha y método de pago en JSON.
+- **Registro automático**: Crea la transacción en ezBookkeeping vía API REST.
+- **Confirmación al usuario**: Responde por Telegram con los datos registrados.
 
----
+## Estructura del Proyecto
 
-## 🛠️ Requisitos Previos
+```
+src/
+├── main.py                          # Entrypoint FastAPI
+├── config.py                        # Logging y paths
+├── schemas.py                       # Modelos Pydantic para Telegram webhook
+├── routers/
+│   └── telegram.py                  # Webhook handler, auth, flujo principal
+├── services/
+│   ├── groq_service.py              # Integración con Groq Vision API
+│   ├── ezbookkeeping_service.py     # API ezBookkeeping
+│   └── telegram_file_service.py     # Descarga/eliminación de fotos
+├── utils/
+│   └── formatter.py                 # Validación de fechas, mensajes de confirmación
+└── templates/
+    └── voucher_prompt.md            # Prompt del sistema para Groq AI
+```
 
-Antes de comenzar, asegúrate de tener instalado en tu máquina de desarrollo:
-* **mise** (para gestionar la versión de Python y tareas).
-* **uv** (para la gestión rápida de entornos virtuales y dependencias).
-* **cloudflared** (CLI de Cloudflare para exponer el entorno local).
+## Requisitos
 
----
+- **mise** — gestión de versiones de Python y tareas.
+- **uv** — gestión de dependencias.
+- **cloudflared** — túnel HTTPS para desarrollo local.
 
-## ⚙️ Configuración del Entorno
+## Configuración
 
-El proyecto utiliza variables de entorno para manejar tokens sensibles y configuraciones de acceso. 
-
-### 1. Variables de Entorno
-Crea un archivo de configuración local para `mise` llamado `mise.local.toml` en la raíz del proyecto (este archivo está excluido en el `.gitignore`):
+Crea `mise.local.toml` en la raíz del proyecto (git-ignored):
 
 ```toml
 [env]
-TELEGRAM_BOT_TOKEN = "tu_token_secreto_de_botfather"
-USUARIOS_PERMITIDOS = "123456789,987654321" # IDs de Telegram separados por comas
+TELEGRAM_BOT_TOKEN = "tu_token_de_botfather"
+ALLOWED_USERS = "123456789,987654321"
 ```
 
-## Flujo de Desarrollo Local
+Luego instala dependencias:
 
-Para desarrollar y probar el bot en tu máquina local, necesitas levantar el servidor e interconectar Telegram con tu entorno mediante un túnel seguro.
+```bash
+uv sync
+```
 
-### 1. Levantar el servidor FastAPI
+## Desarrollo Local
 
-Ejecuta la tarea de desarrollo preconfigurada en el proyecto. Esta tarea arranca el servidor con recarga automática (`--reload`):
+### 1. Levantar el servidor
+
 ```bash
 mise run dev
 ```
-*El servidor se quedará escuchando localmente en `http://127.0.0.1:8000`.*
 
-### 2. Abrir el túnel con Cloudflared
+El servidor escucha en `http://127.0.0.1:8000`.
 
-Dado que Telegram requiere una URL pública cifrada (HTTPS) para enviar los mensajes, abre otra pestaña de la terminal e inicia el túnel:
+### 2. Abrir túnel con Cloudflared
 
 ```bash
 cloudflared tunnel --url http://localhost:8000
 ```
-*Busca en la consola y copia la URL pública generada que termina en `.trycloudflare.com` (ej: `https://abc-123.trycloudflare.com`).*
 
-### 3. Vincular el Bot de Telegram (Set Webhook)
-Para finalizar el cableado, debes asociar la URL del túnel al token de tu bot agregando el endpoint `/webhook` al final. Ejecuta el siguiente comando en tu terminal (reemplazando tus credenciales):
+Copia la URL pública generada (termina en `.trycloudflare.com`).
+
+### 3. Vincular el webhook
 
 ```bash
-curl -X POST "https://api.telegram.org/bot<TU_TELEGRAM_BOT_TOKEN>/setWebhook" \
-     -H "Content-Type: application/json" \
-     -d '{"url": "https://TU_SUBDOMINIO_ALEATORIO.trycloudflare.com/webhook"}'
+mise run set-webhook https://TU_URL.trycloudflare.com
 ```
 
-## Verificación y Pruebas
-
-### Comprobar el estado del Webhook
-
-Puedes validar en cualquier momento qué dirección tiene registrada Telegram y si existen errores de entrega ejecutando:
+O manualmente:
 
 ```bash
-curl "https://api.telegram.org/bot<TU_TELEGRAM_BOT_TOKEN>/getWebhookInfo"
+curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+     -H "Content-Type: application/json" \
+     -d '{"url": "https://TU_URL.trycloudflare.com/webhook"}'
+```
+
+### 4. Verificar
+
+```bash
+curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
 ```

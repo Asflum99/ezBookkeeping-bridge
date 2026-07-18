@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from config.logger import logger
+from config import logger
 
 EZBOOKKEEPING_URL = os.getenv("EZBOOKKEEPING_URL")
 if not EZBOOKKEEPING_URL:
