@@ -38,9 +38,14 @@ Telegram finance bot. **FastAPI** (Python 3.12). Receives voucher photos via Tel
 3. Set webhook: `mise run set-webhook <tunnel-url>`
 4. Verify webhook: `curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"`
 
+## Version Control
+
+- If `.jj/` folder exists in repo root → use `jj` (jujutsu).
+- Otherwise → use `git`.
+
 ## Notes
 
-- No test suite yet.
+- Tests in `tests/`.
 - No linting/formatting config.
 - App needs `cloudflared` for local dev (Telegram requires HTTPS).
 - Photos downloaded to `tmp/`, deleted after processing.
