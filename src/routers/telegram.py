@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from config import ACCOUNTS_JSON_PATH, logger
 from schemas import TelegramUpdate
 from services.ezbookkeeping_service import register_transaction
-from services.groq_service import process_expense_with_ai
+from services.llm_service import process_expense_with_ai
 from services.telegram_file_service import delete_local_file, download_telegram_photo
 from utils.formatter import (
     prepare_confirmation_message,

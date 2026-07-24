@@ -9,6 +9,7 @@ ACCOUNTS_JSON_PATH = os.path.join(PROJECT_ROOT, "data", "cuentas.json")
 LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
 os.makedirs(LOGS_DIR, exist_ok=True)
 LOG_FILE = os.path.join(LOGS_DIR, "bot.log")
+LLM_MODEL = os.getenv("LLM_MODEL")
 
 LOG_LEVEL_STR = os.getenv("LOG_LEVEL", "INFO").upper().strip()
 LOG_LEVELS = {
@@ -55,3 +56,10 @@ logging.basicConfig(
 
 logger = logging.getLogger("bot_finanzas")
 logger.setLevel(LOG_LEVEL_NUMERIC)
+
+if not LLM_MODEL:
+    logger.critical(
+        "❌ CRITICAL CONFIGURATION ERROR: 'LLM_MODEL' environment variable is not defined or is empty. "
+        "Please specify a valid vision model in your mise.local.toml."
+    )
+    raise RuntimeError("Missing required environment variable: LLM_MODEL")
