@@ -63,3 +63,10 @@ if not LLM_MODEL:
         "Please specify a valid vision model in your mise.local.toml."
     )
     raise RuntimeError("Missing required environment variable: LLM_MODEL")
+
+EZBOOKKEEPING_URL = os.getenv("EZBOOKKEEPING_URL")
+if not EZBOOKKEEPING_URL:
+    logger.critical(
+        "❌ ERROR CRÍTICO: La variable de entorno EZBOOKKEEPING_URL no está configurada."
+    )
+    raise RuntimeError("Missing required environment variable: EZBOOKKEEPING_URL")
