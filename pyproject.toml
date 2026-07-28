@@ -17,3 +17,12 @@ dependencies = [
 
 [tool.ty.environment]
 root = ["./src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[dependency-groups]
+dev = [
+    "pytest-asyncio>=1.4.0",
+    "respx>=0.23.1",
+]

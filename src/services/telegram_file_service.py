@@ -2,7 +2,7 @@ import os
 
 import httpx
 
-from config import logger, PROJECT_ROOT
+from config import PROJECT_ROOT, logger
 
 TMP_DIR = os.path.join(PROJECT_ROOT, "tmp")
 
