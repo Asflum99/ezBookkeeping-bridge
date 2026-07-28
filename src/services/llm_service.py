@@ -1,11 +1,13 @@
 import base64
 import os
+import re
 from functools import lru_cache
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.runnables import RunnableLambda
 
 from config import (
     LLM_API_KEY,
@@ -25,31 +27,48 @@ def build_system_prompt(user_categories: list[str]) -> str:
 @lru_cache(1)
 def _get_llm() -> BaseChatModel:
     """Factory: lazy-import provider package and return configured LLM."""
-    if LLM_PROVIDER == "groq":
-        from langchain_groq import ChatGroq  # ty: ignore[unresolved-import]
+    try:
+        if LLM_PROVIDER == "groq":
+            from langchain_groq import ChatGroq  # ty: ignore[unresolved-import]
 
-        return ChatGroq(model=LLM_MODEL, temperature=0.0, api_key=LLM_API_KEY)
-    elif LLM_PROVIDER == "openai":
-        from langchain_openai import ChatOpenAI  # ty: ignore[unresolved-import]
+            return ChatGroq(model=LLM_MODEL, temperature=0.0, api_key=LLM_API_KEY)
+        elif LLM_PROVIDER == "openai":
+            from langchain_openai import ChatOpenAI  # ty: ignore[unresolved-import]
 
-        return ChatOpenAI(model=LLM_MODEL, temperature=0.0, api_key=LLM_API_KEY)
-    elif LLM_PROVIDER == "anthropic":
-        from langchain_anthropic import ChatAnthropic  # ty: ignore[unresolved-import]
+            return ChatOpenAI(model=LLM_MODEL, temperature=0.0, api_key=LLM_API_KEY)
+        elif LLM_PROVIDER == "anthropic":
+            from langchain_anthropic import (  # ty: ignore[unresolved-import]
+                ChatAnthropic,
+            )
 
-        return ChatAnthropic(model=LLM_MODEL, temperature=0.0, api_key=LLM_API_KEY)
-    elif LLM_PROVIDER == "gemini":
-        from langchain_google_genai import (  # ty: ignore[unresolved-import]
-            ChatGoogleGenerativeAI,
+            return ChatAnthropic(model=LLM_MODEL, temperature=0.0, api_key=LLM_API_KEY)
+        elif LLM_PROVIDER == "gemini":
+            from langchain_google_genai import (  # ty: ignore[unresolved-import]
+                ChatGoogleGenerativeAI,
+            )
+
+            return ChatGoogleGenerativeAI(
+                model=LLM_MODEL, temperature=0.0, google_api_key=LLM_API_KEY
+            )
+        else:
+            raise ValueError(f"Unsupported LLM provider: {LLM_PROVIDER}")
+    except ModuleNotFoundError:
+        raise RuntimeError(
+            f"Missing dependency for LLM provider '{LLM_PROVIDER}'. "
+            f'Install it with: uv pip install -e ".[{LLM_PROVIDER}]"'
         )
-
-        return ChatGoogleGenerativeAI(
-            model=LLM_MODEL, temperature=0.0, google_api_key=LLM_API_KEY
-        )
-    else:
-        raise ValueError(f"Unsupported LLM provider: {LLM_PROVIDER}")
 
 
 _PARSER = JsonOutputParser()
+
+_THINKING_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+def _strip_thinking(text) -> str:
+    """Remove reasoning model thinking blocks before JSON parsing."""
+    if hasattr(text, "content"):
+        text = text.content
+    return _THINKING_RE.sub("", text).strip()
 
 
 def _encode_image(local_photo_path: str) -> str:
@@ -99,7 +118,7 @@ def process_expense_with_ai(
 
         logger.debug("Sending payload to Vision Model via LangChain...")
 
-        chain = _get_llm() | _PARSER
+        chain = _get_llm() | RunnableLambda(_strip_thinking) | _PARSER
 
         parsed_data: dict[str, Any] = chain.invoke(messages)
 

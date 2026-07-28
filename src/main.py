@@ -17,7 +17,7 @@ if not os.getenv("TELEGRAM_BOT_TOKEN") or not os.getenv("ALLOWED_USERS"):
 
 init_config()
 
-app = FastAPI()
+app = FastAPI(redirect_slashes=False)
 
 app.include_router(telegram_router)
 

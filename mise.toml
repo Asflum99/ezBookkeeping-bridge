@@ -14,7 +14,7 @@ arg "<url>" help="La URL nueva que te otorga cloudflared"
 run = '''
 curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
      -H "Content-Type: application/json" \
-     -d "{\"url\": \"${usage_url?}/webhook\"}"
+     -d "{\"url\": \"${usage_url?}/webhook/telegram/\"}"
 '''
 
 [tasks.start]

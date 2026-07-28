@@ -179,12 +179,18 @@ class TestProcessExpenseWithAi:
     def test_calls_llm_with_correct_messages(self, tmp_path, mocker):
         mocker.patch("services.llm_service._PARSER")
         mocker.patch("services.llm_service._encode_image", return_value="base64data")
+        mocker.patch("services.llm_service._strip_thinking", side_effect=lambda x: x)
 
-        mock_chain = mocker.MagicMock()
-        mock_chain.invoke.return_value = {"amount": 100}
+        # Build a mock chain: mock_llm | RunnableLambda(...) | _PARSER
+        # The chain invokes mock_llm.__or__(...) then result.__or__(_PARSER)
+        final_parser = mocker.MagicMock()
+        final_parser.invoke.return_value = {"amount": 100}
+
+        step2 = mocker.MagicMock()
+        step2.__or__ = mocker.MagicMock(return_value=final_parser)
 
         mock_llm = mocker.MagicMock()
-        mock_llm.__or__.return_value = mock_chain
+        mock_llm.__or__ = mocker.MagicMock(return_value=step2)
         mocker.patch("services.llm_service._get_llm", return_value=mock_llm)
 
         image_file = tmp_path / "test.jpg"
@@ -193,8 +199,8 @@ class TestProcessExpenseWithAi:
         result = process_expense_with_ai(str(image_file), ["Comida", "Ropa"])
 
         assert result == {"amount": 100}
-        mock_chain.invoke.assert_called_once()
-        messages = mock_chain.invoke.call_args[0][0]
+        final_parser.invoke.assert_called_once()
+        messages = final_parser.invoke.call_args[0][0]
         assert isinstance(messages[0], SystemMessage)
         assert "Comida" in messages[0].content
         assert "Ropa" in messages[0].content

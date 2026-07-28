@@ -289,6 +289,43 @@ class TestTelegramMessage:
 
         assert msg.photo is None
 
+    def test_telegram_message_with_text(self):
+        """Verify that text field is parsed correctly."""
+        data = {
+            "message_id": 3,
+            "date": 1700000000,
+            "chat": {"id": 100200300, "type": "private"},
+            "from": {"id": 987654, "is_bot": False, "first_name": "Bob"},
+            "text": "/add_account billetera_digital 123456",
+        }
+
+        msg = TelegramMessage.model_validate(data)
+
+        assert msg.text == "/add_account billetera_digital 123456"
+        assert msg.photo is None
+
+    def test_telegram_message_optional_text_defaults_to_none(self):
+        """Verify that text defaults to None when omitted in photo messages."""
+        data = {
+            "message_id": 4,
+            "date": 1700000000,
+            "chat": {"id": 100200300, "type": "private"},
+            "from": {"id": 987654, "is_bot": False, "first_name": "Bob"},
+            "photo": [
+                {
+                    "file_id": "photo_id",
+                    "file_unique_id": "uniq_id",
+                    "width": 320,
+                    "height": 240,
+                }
+            ],
+        }
+
+        msg = TelegramMessage.model_validate(data)
+
+        assert msg.text is None
+        assert msg.photo is not None
+
     @pytest.mark.parametrize(
         "incomplete_payload, missing_field",
         [

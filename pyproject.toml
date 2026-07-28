@@ -25,6 +25,7 @@ addopts = "--cov=src --cov-report=term-missing"
 [dependency-groups]
 dev = [
   "debugpy>=1.8.21",
+  "httpx2>=2.9.1",
   "pytest-asyncio>=1.4.0",
   "pytest-cov>=7.1.0",
   "pytest-mock>=3.15.1",

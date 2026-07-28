@@ -29,6 +29,7 @@ class TelegramMessage(BaseModel):
 
     from_user: TelegramUser = Field(..., alias="from")
     photo: Optional[list[TelegramPhotoSize]] = None
+    text: Optional[str] = None
 
 
 class TelegramUpdate(BaseModel):
