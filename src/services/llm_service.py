@@ -1,31 +1,80 @@
 import base64
-import json
 import os
+from functools import lru_cache
 from typing import Any
 
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
-from langchain_groq import ChatGroq
 
-from config import LLM_MODEL, PROJECT_ROOT, logger
-
-_PROMPT_TEMPLATE_PATH = os.path.join(PROJECT_ROOT, "templates", "voucher_prompt.md")
-
-try:
-    with open(_PROMPT_TEMPLATE_PATH, "r", encoding="utf-8") as _f:
-        _SYSTEM_PROMPT_TEMPLATE = _f.read()
-except FileNotFoundError:
-    logger.critical(
-        f"❌ CRITICAL: System prompt template not found at {_PROMPT_TEMPLATE_PATH}. "
-        "The application cannot start without it."
-    )
-    raise
+from config import (
+    LLM_API_KEY,
+    LLM_MODEL,
+    LLM_PROVIDER,
+    SYSTEM_PROMPT_TEMPLATE,
+    logger,
+)
 
 
 def build_system_prompt(user_categories: list[str]) -> str:
     """Format the cached prompt template with user categories."""
     formatted_categories = "\n".join(f"- {cat}" for cat in user_categories)
-    return _SYSTEM_PROMPT_TEMPLATE.format(categories_list=formatted_categories)
+    return SYSTEM_PROMPT_TEMPLATE.format(categories_list=formatted_categories)
+
+
+@lru_cache(1)
+def _get_llm() -> BaseChatModel:
+    """Factory: lazy-import provider package and return configured LLM."""
+    if LLM_PROVIDER == "groq":
+        from langchain_groq import ChatGroq  # ty: ignore[unresolved-import]
+
+        return ChatGroq(model=LLM_MODEL, temperature=0.0, api_key=LLM_API_KEY)
+    elif LLM_PROVIDER == "openai":
+        from langchain_openai import ChatOpenAI  # ty: ignore[unresolved-import]
+
+        return ChatOpenAI(model=LLM_MODEL, temperature=0.0, api_key=LLM_API_KEY)
+    elif LLM_PROVIDER == "anthropic":
+        from langchain_anthropic import ChatAnthropic  # ty: ignore[unresolved-import]
+
+        return ChatAnthropic(model=LLM_MODEL, temperature=0.0, api_key=LLM_API_KEY)
+    elif LLM_PROVIDER == "gemini":
+        from langchain_google_genai import (  # ty: ignore[unresolved-import]
+            ChatGoogleGenerativeAI,
+        )
+
+        return ChatGoogleGenerativeAI(
+            model=LLM_MODEL, temperature=0.0, google_api_key=LLM_API_KEY
+        )
+    else:
+        raise ValueError(f"Unsupported LLM provider: {LLM_PROVIDER}")
+
+
+_PARSER = JsonOutputParser()
+
+
+def _encode_image(local_photo_path: str) -> str:
+    """Read image file and return base64-encoded string."""
+    with open(local_photo_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode("utf-8")
+
+
+def _build_messages(base64_image: str, system_prompt: str) -> list:
+    """Build LangChain message list for vision model."""
+    return [
+        SystemMessage(content=system_prompt),
+        HumanMessage(
+            content=[
+                {
+                    "type": "text",
+                    "text": "Extract the structured data from this payment voucher.",
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                },
+            ]
+        ),
+    ]
 
 
 def process_expense_with_ai(
@@ -39,44 +88,22 @@ def process_expense_with_ai(
     logger.info(f"Starting voucher processing with AI (File: {filename})")
 
     try:
-        with open(local_photo_path, "rb") as image_file:
-            base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+        base64_image = _encode_image(local_photo_path)
     except FileNotFoundError:
         logger.error(f"❌ Local voucher file not found at: {local_photo_path}")
         raise
 
     try:
         system_prompt_text = build_system_prompt(user_categories)
-
-        llm = ChatGroq(
-            model=LLM_MODEL,
-            temperature=0.0,
-        )
-
-        messages = [
-            SystemMessage(content=system_prompt_text),
-            HumanMessage(
-                content=[
-                    {
-                        "type": "text",
-                        "text": "Extract the structured data from this payment voucher.",
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
-                    },
-                ]
-            ),
-        ]
+        messages = _build_messages(base64_image, system_prompt_text)
 
         logger.debug("Sending payload to Vision Model via LangChain...")
 
-        chain = llm | JsonOutputParser()
+        chain = _get_llm() | _PARSER
 
         parsed_data: dict[str, Any] = chain.invoke(messages)
 
         logger.info("Successfully extracted voucher data via LangChain.")
-        logger.debug(f"Raw JSON returned by LLM:\n{json.dumps(parsed_data, indent=2)}")
         return parsed_data
 
     except Exception as e:

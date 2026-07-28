@@ -17,9 +17,22 @@ Telegram finance bot. **FastAPI** (Python 3.12). Receives voucher photos via Tel
    [env]
    TELEGRAM_BOT_TOKEN = "your_token"
    USUARIOS_PERMITIDOS = "123456789,987654321"  # comma-separated Telegram IDs
+   LLM_PROVIDER = "groq"                        # groq | openai | anthropic | gemini
+   LLM_MODEL = "llama-3.2-90b-vision-preview"   # model name for chosen provider
+   GROQ_API_KEY = "gsk_..."                      # provider-specific API key
+   EZBOOKKEEPING_URL = "https://..."
    ```
 
 2. Run `uv sync` (deps managed via `pyproject.toml`).
+
+3. Install at least one LLM provider:
+   ```bash
+   uv pip install -e ".[groq]"      # for Groq (default)
+   uv pip install -e ".[openai]"    # for OpenAI
+   uv pip install -e ".[anthropic]" # for Anthropic
+   uv pip install -e ".[gemini]"    # for Google Gemini
+   uv pip install -e ".[all]"       # all providers
+   ```
 
 ## Architecture
 
