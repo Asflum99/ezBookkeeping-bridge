@@ -1,11 +1,11 @@
-# Telegram Finance Bot
+# ezBookkeeping-bridge
 
-Lightweight backend built with **FastAPI** for recording expenses sent as voucher photos from a private Telegram bot. Uses AI (Groq Vision) to extract structured data and registers transactions in ezBookkeeping.
+Lightweight backend built with **FastAPI** for recording expenses sent as voucher photos from a private Telegram bot. Uses AI to extract structured data and registers transactions in ezBookkeeping.
 
 ## Features
 
 - **Access control**: Filtered by authorized Telegram IDs.
-- **AI extraction**: Sends voucher photos to Groq Vision, returns category, amount, date, and payment method as JSON.
+- **AI extraction**: Sends voucher photos to LLM, returns category, amount, date, and payment method as JSON.
 - **Automatic registration**: Creates transactions in ezBookkeeping via REST API.
 - **User confirmation**: Replies on Telegram with the recorded data.
 

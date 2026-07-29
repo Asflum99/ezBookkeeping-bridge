@@ -1,11 +1,11 @@
-# Telegram Finance Bot
+# ezBookkeeping-bridge
 
-Backend ligero desarrollado con **FastAPI** para registrar gastos enviados como fotos de vouchers desde un bot privado de Telegram. Usa IA (Groq Vision) para extraer datos estructurados y los registra en ezBookkeeping.
+Backend ligero desarrollado con **FastAPI** para registrar gastos enviados como fotos de vouchers desde un bot privado de Telegram. Usa IA para extraer datos estructurados y los registra en ezBookkeeping.
 
 ## Características
 
 - **Control de acceso**: Filtrado por IDs de Telegram autorizados.
-- **Extracción con IA**: Envía la foto del voucher a Groq Vision, obtiene categoría, monto, fecha y método de pago en JSON.
+- **Extracción con IA**: Envía la foto del voucher a LLM, obtiene categoría, monto, fecha y método de pago en JSON.
 - **Registro automático**: Crea la transacción en ezBookkeeping vía API REST.
 - **Confirmación al usuario**: Responde por Telegram con los datos registrados.
 
