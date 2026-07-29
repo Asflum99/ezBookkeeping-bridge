@@ -16,10 +16,13 @@ Telegram finance bot. **FastAPI** (Python 3.12). Receives voucher photos via Tel
    ```toml
    [env]
    TELEGRAM_BOT_TOKEN = "your_token"
-   USUARIOS_PERMITIDOS = "123456789,987654321"  # comma-separated Telegram IDs
+   ALLOWED_USERS = "123456789,987654321"  # comma-separated Telegram IDs
    LLM_PROVIDER = "groq"                        # groq | openai | anthropic | gemini
-   LLM_MODEL = "llama-3.2-90b-vision-preview"   # model name for chosen provider
-   GROQ_API_KEY = "gsk_..."                      # provider-specific API key
+   LLM_MODEL = "..."   # model name for chosen provider
+   GROQ_API_KEY = "gsk_..."                      # if LLM_PROVIDER = "groq"
+   OPENAI_API_KEY = "sk-..."                     # if LLM_PROVIDER = "openai"
+   ANTHROPIC_API_KEY = "sk-ant-..."              # if LLM_PROVIDER = "anthropic"
+   GOOGLE_API_KEY = "AIza..."                    # if LLM_PROVIDER = "gemini"
    EZBOOKKEEPING_URL = "https://..."
    ```
 
@@ -37,12 +40,15 @@ Telegram finance bot. **FastAPI** (Python 3.12). Receives voucher photos via Tel
 ## Architecture
 
 - **Entrypoint**: `src/main.py` (FastAPI app)
-- **Webhook**: `POST /webhook`
-- **Services**: `src/services/` (auth, Groq AI, ezBookkeeping, Telegram, user categories)
-- **Schemas**: `src/schemas.py` (Pydantic models for Telegram updates + business objects)
-- **Config**: `src/config.py` (logging setup)
-- **Data**: `data/cuentas.json` (git-ignored, user-specific ezBookkeeping account mappings)
-- **Templates**: `src/templates/voucher_prompt.md` (Groq AI prompt for expense extraction; categories dynamically inserted)
+- **Webhook**: `POST /webhook/telegram`
+- **Routers**: `src/routers/telegram/` (photo processing, webhook dispatch)
+- **Services**: `src/services/` (Groq AI, ezBookkeeping, Telegram file)
+- **Repositories**: `src/repositories/` (UserRepository - SQLite)
+- **DI**: `src/routers/telegram/webhook.py` (get_user_repository)
+- **Schemas**: `src/schemas.py` (Pydantic models for Telegram updates)
+- **Config**: `src/config.py` (logging, database path)
+- **Database**: `data/finanzas.db` (SQLite - users, accounts, categories)
+- **Templates**: `src/templates/voucher_prompt.md` (Groq AI prompt)
 
 ## Dev Workflow
 
@@ -63,4 +69,4 @@ Telegram finance bot. **FastAPI** (Python 3.12). Receives voucher photos via Tel
 - App needs `cloudflared` for local dev (Telegram requires HTTPS).
 - Photos downloaded to `tmp/`, deleted after processing.
 - Logs written to `logs/`.
-- `data/cuentas.json` (git-ignored) stores user-specific ezBookkeeping account mappings.
+- `data/finanzas.db` stores users, accounts, categories in SQLite.

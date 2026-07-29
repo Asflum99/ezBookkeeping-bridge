@@ -14,18 +14,24 @@ Lightweight backend built with **FastAPI** for recording expenses sent as vouche
 ```
 src/
 ├── main.py                          # FastAPI entrypoint
-├── config.py                        # Logging and paths
+├── config.py                        # Logging, paths, env vars
 ├── schemas.py                       # Pydantic models for Telegram webhook
+├── database.py                      # SQLite connection + schema
+├── formatter.py                     # Date validation, confirmation messages
 ├── routers/
-│   └── telegram.py                  # Webhook handler, auth, main flow
+│   └── telegram/
+│       ├── __init__.py              # Router re-export
+│       ├── webhook.py               # POST /, DI, dispatcher
+│       ├── photo.py                 # Photo processing
+│       └── utils.py                 # send_telegram_message
+├── repositories/
+│   └── user_repository.py           # SQLite CRUD
 ├── services/
-│   ├── groq_service.py              # Groq Vision API integration
+│   ├── llm_service.py               # LLM integration (Groq/OpenAI/etc)
 │   ├── ezbookkeeping_service.py     # ezBookkeeping API
 │   └── telegram_file_service.py     # Photo download/cleanup
-├── utils/
-│   └── formatter.py                 # Date validation, confirmation messages
 └── templates/
-    └── voucher_prompt.md            # System prompt for Groq AI
+    └── voucher_prompt.md            # System prompt for LLM
 ```
 
 ## Requirements
@@ -41,13 +47,30 @@ Create `mise.local.toml` in the project root (git-ignored):
 ```toml
 [env]
 TELEGRAM_BOT_TOKEN = "your_botfather_token"
-ALLOWED_USERS = "123456789,987654321"
+ALLOWED_USERS = "123456789,987654321"    # Authorized Telegram IDs
+LLM_PROVIDER = "groq"                    # groq | openai | anthropic | gemini
+LLM_MODEL = "..."
+GROQ_API_KEY = "gsk_..."                 # if LLM_PROVIDER = "groq"
+OPENAI_API_KEY = "sk-..."                # if LLM_PROVIDER = "openai"
+ANTHROPIC_API_KEY = "sk-ant-..."         # if LLM_PROVIDER = "anthropic"
+GOOGLE_API_KEY = "AIza..."               # if LLM_PROVIDER = "gemini"
+EZBOOKKEEPING_URL = "https://..."
 ```
 
 Then install dependencies:
 
 ```bash
 uv sync
+```
+
+Install the LLM provider you'll use:
+
+```bash
+uv pip install -e ".[groq]"      # for Groq
+uv pip install -e ".[openai]"    # for OpenAI
+uv pip install -e ".[anthropic]" # for Anthropic
+uv pip install -e ".[gemini]"    # for Google Gemini
+uv pip install -e ".[all]"       # all providers
 ```
 
 ## Local Development
@@ -79,7 +102,7 @@ Or manually:
 ```bash
 curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
      -H "Content-Type: application/json" \
-     -d '{"url": "https://YOUR_URL.trycloudflare.com/webhook"}'
+     -d '{"url": "https://YOUR_URL.trycloudflare.com/webhook/telegram/"}'
 ```
 
 ### 4. Verify
