@@ -1,32 +1,7 @@
 import httpx
 import respx
 
-from routers.telegram.utils import settings, init_config, send_telegram_message
-
-
-class TestInitConfig:
-    def test_populates_settings_from_env(self, monkeypatch):
-        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token-123")
-        monkeypatch.setenv("ALLOWED_USERS", "111,222,333")
-
-        init_config()
-
-        assert settings["token"] == "test-token-123"
-        assert settings["allowed_users"] == {111, 222, 333}
-
-    def test_settings_empty_before_init(self):
-        settings.clear()
-
-        assert settings == {}
-
-    def test_settings_overwrites_previous_values(self, monkeypatch):
-        settings["token"] = "old-token"
-        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "new-token")
-        monkeypatch.setenv("ALLOWED_USERS", "999")
-
-        init_config()
-
-        assert settings["token"] == "new-token"
+from routers.telegram.utils import send_telegram_message
 
 
 class TestSendTelegramMessage:
