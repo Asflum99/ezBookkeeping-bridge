@@ -1,12 +1,13 @@
 import base64
 
 import pytest
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from services.llm_service import (
     _build_messages,
     _encode_image,
     _get_llm,
+    _strip_thinking,
     build_system_prompt,
     process_expense_with_ai,
 )
@@ -121,6 +122,31 @@ class TestGetLlm:
 
         with pytest.raises(ValueError, match="Unsupported LLM provider"):
             _get_llm()
+
+
+class TestStripThinking:
+    def test_removes_think_block(self):
+        text = "{\"amount\": 3}"
+        result = _strip_thinking(text)
+        assert result == '{"amount": 3}'
+
+    def test_passthrough_plain_json(self):
+        result = _strip_thinking('{"amount": 3}')
+        assert result == '{"amount": 3}'
+
+    def test_handles_aimessage(self):
+        msg = AIMessage(content='{"amount": 3}')
+        result = _strip_thinking(msg)
+        assert result == '{"amount": 3}'
+
+    def test_handles_aimessage_with_think_block(self):
+        msg = AIMessage(content="<think>reasoning</think>\n{\"amount\": 3}")
+        result = _strip_thinking(msg)
+        assert result == '{"amount": 3}'
+
+    def test_handles_empty_string(self):
+        result = _strip_thinking("")
+        assert result == ""
 
 
 class TestEncodeImage:

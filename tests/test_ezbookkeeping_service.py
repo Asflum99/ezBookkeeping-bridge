@@ -130,3 +130,15 @@ class TestRegisterTransaction:
         )
 
         assert result is False
+
+    async def test_unexpected_exception_returns_false(self, mocker):
+        mock_client = mocker.AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.post.side_effect = AttributeError("unexpected")
+        mocker.patch("httpx.AsyncClient", return_value=mock_client)
+
+        result = await register_transaction(
+            self.VALID_SANITIZED_DATA, self.VALID_USER_INFO
+        )
+
+        assert result is False
