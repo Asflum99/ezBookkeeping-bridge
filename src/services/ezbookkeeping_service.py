@@ -1,19 +1,10 @@
-import os
-import sys
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import httpx
 
-from config import logger
-
-EZBOOKKEEPING_URL = os.getenv("EZBOOKKEEPING_URL")
-if not EZBOOKKEEPING_URL:
-    logger.critical(
-        "❌ ERROR CRÍTICO: La variable de entorno EZBOOKKEEPING_URL no está configurada."
-    )
-    sys.exit(1)
+from config import EZBOOKKEEPING_URL, logger
 
 
 async def register_transaction(
@@ -21,7 +12,13 @@ async def register_transaction(
 ) -> bool:
     """
     Submits the transaction to the ezBookkeeping API using the user's specific token.
-    Resolves category IDs and source account IDs dynamically from user_info.
+
+    Expects sanitized_data from validate_and_sanitize_voucher_data:
+    - amount: int (cents, > 0)
+    - date_time: str ("%Y-%m-%d %H:%M:%S", America/Lima)
+    - category: str (valid category name)
+    - payment_method: str (valid account name)
+    - comment: str
     """
     logger.info("Starting transaction registration in ezBookkeeping.")
     url = f"{EZBOOKKEEPING_URL}/api/v1/transactions/add.json"
@@ -50,18 +47,11 @@ async def register_transaction(
 
     amount_cents = int(round(float(sanitized_data["amount"]) * 100))
 
-    iso_time_str = sanitized_data["date_time"]
-    try:
-        parsed_datetime = datetime.strptime(iso_time_str, "%Y-%m-%d %H:%M:%S").replace(
-            tzinfo=ZoneInfo("America/Lima")
-        )
-        unix_timestamp = int(parsed_datetime.timestamp())
-
-    except (ValueError, TypeError) as e:
-        logger.error(
-            f"❌ Failed to convert date '{iso_time_str}' to Unix timestamp: {e}. Falling back to now."
-        )
-        unix_timestamp = int(datetime.now(ZoneInfo("America/Lima")).timestamp())
+    iso_time_str = cast(str, sanitized_data["date_time"])
+    parsed_datetime = datetime.strptime(iso_time_str, "%Y-%m-%d %H:%M:%S").replace(
+        tzinfo=ZoneInfo("America/Lima")
+    )
+    unix_timestamp = int(parsed_datetime.timestamp())
 
     headers = {
         "Authorization": f"Bearer {user_info['ez_token']}",
@@ -75,7 +65,7 @@ async def register_transaction(
         "categoryId": category_id,
         "sourceAmount": amount_cents,
         "time": unix_timestamp,
-        "comment": sanitized_data["comment"],
+        "comment": sanitized_data.get("comment", ""),
         "sourceAccountId": source_account_id,
         "utcOffset": -300,
     }
