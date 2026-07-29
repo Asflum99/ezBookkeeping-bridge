@@ -25,8 +25,6 @@ SANITIZED_DATA = {
     "comment": "Tambo",
 }
 
-DEFAULT_CONFIG = {"token": "TOKEN", "allowed_users": {12345}}
-
 WEBHOOK_PATH = "/webhook/telegram/"
 
 
@@ -48,7 +46,7 @@ def _make_update(**overrides):
 
 def _build_client(user_repo_mock):
     """Create a TestClient with a mocked UserRepository."""
-    from dependencies import get_user_repository
+    from routers.telegram.webhook import get_user_repository
     from routers.telegram import router
 
     app = FastAPI()
@@ -60,7 +58,8 @@ def _build_client(user_repo_mock):
 class TestTelegramWebhook:
     @pytest.fixture(autouse=True)
     def _mock_config(self, mocker):
-        mocker.patch("routers.telegram.photo.settings", DEFAULT_CONFIG)
+        mocker.patch("routers.telegram.photo.TELEGRAM_BOT_TOKEN", "TOKEN")
+        mocker.patch("routers.telegram.photo.ALLOWED_USERS", {12345})
 
     # --- No photo / no message ---
 

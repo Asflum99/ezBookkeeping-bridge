@@ -1,10 +1,10 @@
-import os
+from pathlib import Path
 
 import httpx
 
 from config import PROJECT_ROOT, logger
 
-TMP_DIR = os.path.join(PROJECT_ROOT, "tmp")
+TMP_DIR = PROJECT_ROOT / "tmp"
 
 
 async def download_telegram_photo(telegram_bot_token: str, file_id: str) -> str:
@@ -12,7 +12,7 @@ async def download_telegram_photo(telegram_bot_token: str, file_id: str) -> str:
     Retrieves the file path from Telegram, downloads the photo to the tmp/ folder,
     and returns the local file path.
     """
-    os.makedirs(TMP_DIR, exist_ok=True)
+    TMP_DIR.mkdir(exist_ok=True)
 
     info_url = (
         f"https://api.telegram.org/bot{telegram_bot_token}/getFile?file_id={file_id}"
@@ -32,8 +32,8 @@ async def download_telegram_photo(telegram_bot_token: str, file_id: str) -> str:
             f"https://api.telegram.org/file/bot{telegram_bot_token}/{file_path}"
         )
 
-        file_extension = os.path.splitext(file_path)[1]
-        local_destination = os.path.join(TMP_DIR, f"{file_id}{file_extension}")
+        file_extension = Path(file_path).suffix
+        local_destination = TMP_DIR / f"{file_id}{file_extension}"
 
         async with client.stream("GET", download_url) as stream_response:
             stream_response.raise_for_status()
@@ -42,7 +42,7 @@ async def download_telegram_photo(telegram_bot_token: str, file_id: str) -> str:
                     f.write(chunk)
 
         logger.info(f"⬇️ File downloaded successfully to: {local_destination}")
-        return local_destination
+        return str(local_destination)
 
 
 def delete_local_file(file_path: str) -> None:
@@ -50,8 +50,7 @@ def delete_local_file(file_path: str) -> None:
     Safely deletes the specified local file if it exists.
     """
     try:
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            logger.info(f"🗑️ Temporary file deleted: {file_path}")
+        Path(file_path).unlink(missing_ok=True)
+        logger.info(f"🗑️ Temporary file deleted: {file_path}")
     except Exception as e:
         logger.warning(f"⚠️ Failed to delete temporary file {file_path}. Error: {e}")

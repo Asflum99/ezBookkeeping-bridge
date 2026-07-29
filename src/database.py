@@ -1,5 +1,6 @@
 import sqlite3
 from contextlib import contextmanager
+from pathlib import Path
 
 from config import DATABASE_PATH, logger
 
@@ -28,7 +29,7 @@ CREATE TABLE IF NOT EXISTS user_categories (
 """
 
 
-def init_db(db_path: str = DATABASE_PATH) -> None:
+def init_db(db_path: Path = DATABASE_PATH) -> None:
     """Create tables if they don't exist."""
     conn = sqlite3.connect(db_path)
     try:
@@ -40,7 +41,7 @@ def init_db(db_path: str = DATABASE_PATH) -> None:
 
 
 @contextmanager
-def get_db(db_path: str = DATABASE_PATH):
+def get_db(db_path: Path = DATABASE_PATH):
     """Context manager for database connections."""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row

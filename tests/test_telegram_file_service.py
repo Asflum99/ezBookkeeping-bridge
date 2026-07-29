@@ -88,14 +88,13 @@ class TestDeleteLocalFile:
 
         assert not fake_file.exists()
 
-    def test_delete_logs_on_error(self, monkeypatch, tmp_path, caplog):
+    def test_delete_logs_on_error(self, tmp_path, caplog, mocker):
         fake_file = tmp_path / "photo.jpg"
         fake_file.write_bytes(b"content")
 
-        def mock_remove(_path):
-            raise PermissionError("access denied")
-
-        monkeypatch.setattr("os.remove", mock_remove)
+        mocker.patch.object(
+            Path, "unlink", side_effect=PermissionError("access denied")
+        )
 
         delete_local_file(str(fake_file))
 

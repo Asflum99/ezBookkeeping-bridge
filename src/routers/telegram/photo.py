@@ -1,16 +1,18 @@
 from typing import cast
 
-from config import logger
+from fastapi import HTTPException
+
+from config import ALLOWED_USERS, TELEGRAM_BOT_TOKEN, logger
+from formatter import (
+    prepare_confirmation_message,
+    validate_and_sanitize_voucher_data,
+)
 from repositories.user_repository import UserRepository
-from routers.telegram.utils import send_telegram_message, settings
+from routers.telegram.utils import send_telegram_message
 from schemas import TelegramMessage, TelegramPhotoSize, TelegramUpdate
 from services.ezbookkeeping_service import register_transaction
 from services.llm_service import process_expense_with_ai
 from services.telegram_file_service import delete_local_file, download_telegram_photo
-from utils.formatter import (
-    prepare_confirmation_message,
-    validate_and_sanitize_voucher_data,
-)
 
 
 async def handle_photo(
@@ -18,15 +20,13 @@ async def handle_photo(
     user_repo: UserRepository,
 ) -> dict:
     """Process a photo message (voucher)."""
-    token = settings["token"]
+    token = TELEGRAM_BOT_TOKEN
     payload_message = cast(TelegramMessage, payload.message)
     chat_id = payload_message.chat.id
     user_id = payload_message.from_user.id
 
-    if user_id not in settings["allowed_users"]:
+    if user_id not in ALLOWED_USERS:
         logger.warning(f"🚫 Access denied attempt for Telegram ID: {user_id}")
-        from fastapi import HTTPException
-
         raise HTTPException(status_code=403, detail="Unauthorized access")
 
     payload_message_photo = cast(list[TelegramPhotoSize], payload_message.photo)

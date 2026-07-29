@@ -1,31 +1,27 @@
 import logging
 import os
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 import colorlog
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ACCOUNTS_JSON_PATH = os.path.join(PROJECT_ROOT, "data", "cuentas.json")
-DATABASE_PATH = os.path.join(PROJECT_ROOT, "data", "bot.db")
-LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
-os.makedirs(LOGS_DIR, exist_ok=True)
-LOG_FILE = os.path.join(LOGS_DIR, "bot.log")
-PROMPT_TEMPLATE_PATH = os.path.join(
-    PROJECT_ROOT, "src", "templates", "voucher_prompt.md"
-)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ACCOUNTS_JSON_PATH = PROJECT_ROOT / "data" / "cuentas.json"
+DATABASE_PATH = PROJECT_ROOT / "data" / "bot.db"
+LOGS_DIR = PROJECT_ROOT / "logs"
+LOGS_DIR.mkdir(exist_ok=True)
+LOG_FILE = LOGS_DIR / "bot.log"
+PROMPT_TEMPLATE_PATH = PROJECT_ROOT / "src" / "templates" / "voucher_prompt.md"
 LLM_MODEL = os.getenv("LLM_MODEL")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") or ""
+ALLOWED_USERS = {
+    int(uid) for uid in os.getenv("ALLOWED_USERS", "").split(",") if uid.strip()
+}
 
 SUPPORTED_PROVIDERS = {"groq", "openai", "anthropic", "gemini"}
 
 LOG_LEVEL_STR = os.getenv("LOG_LEVEL", "INFO").upper().strip()
-LOG_LEVELS = {
-    "DEBUG": logging.DEBUG,
-    "INFO": logging.INFO,
-    "WARNING": logging.WARNING,
-    "ERROR": logging.ERROR,
-    "CRITICAL": logging.CRITICAL,
-}
-LOG_LEVEL_NUMERIC = LOG_LEVELS.get(LOG_LEVEL_STR, logging.INFO)
+LOG_LEVEL_NUMERIC = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 
 # Log file rotation config
 file_handler = RotatingFileHandler(
@@ -61,7 +57,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("bot_finanzas")
-logger.setLevel(LOG_LEVEL_NUMERIC)
 
 if not LLM_MODEL:
     logger.critical(
@@ -107,7 +102,7 @@ if not LLM_API_KEY:
     )
 
 try:
-    with open(PROMPT_TEMPLATE_PATH, "r", encoding="utf-8") as f:
+    with open(PROMPT_TEMPLATE_PATH, encoding="utf-8") as f:
         SYSTEM_PROMPT_TEMPLATE = f.read()
 except FileNotFoundError:
     logger.critical(

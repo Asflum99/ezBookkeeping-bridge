@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -19,7 +17,7 @@ class TelegramPhotoSize(BaseModel):
     file_unique_id: str
     width: int
     height: int
-    file_size: Optional[int] = None
+    file_size: int | None = None
 
 
 class TelegramMessage(BaseModel):
@@ -28,11 +26,11 @@ class TelegramMessage(BaseModel):
     chat: TelegramChat
 
     from_user: TelegramUser = Field(..., alias="from")
-    photo: Optional[list[TelegramPhotoSize]] = None
-    text: Optional[str] = None
+    photo: list[TelegramPhotoSize] | None = None
+    text: str | None = None
 
 
 class TelegramUpdate(BaseModel):
     update_id: int
 
-    message: Optional[TelegramMessage] = None
+    message: TelegramMessage | None = None

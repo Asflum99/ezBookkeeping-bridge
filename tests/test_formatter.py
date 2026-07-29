@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from utils.formatter import (
+from formatter import (
     prepare_confirmation_message,
     validate_and_sanitize_voucher_data,
 )

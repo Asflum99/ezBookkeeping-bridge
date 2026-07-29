@@ -1,17 +1,6 @@
-import os
-
 import httpx
 
 from config import logger
-
-settings = {}
-
-
-def init_config():
-    settings["token"] = os.getenv("TELEGRAM_BOT_TOKEN")
-    settings["allowed_users"] = {
-        int(uid) for uid in os.getenv("ALLOWED_USERS", "").split(",") if uid.strip()
-    }
 
 
 def send_telegram_message(token: str, chat_id: int, texto: str):

@@ -1,12 +1,19 @@
+from functools import lru_cache
+
 from fastapi import APIRouter, Depends
 
 from config import logger
-from dependencies import get_user_repository
 from repositories.user_repository import UserRepository
 from routers.telegram.photo import handle_photo
 from schemas import TelegramUpdate
 
-router = APIRouter()
+router = APIRouter(prefix="/webhook/telegram")
+
+
+@lru_cache(1)
+def get_user_repository() -> UserRepository:
+    """FastAPI dependency: returns singleton UserRepository instance."""
+    return UserRepository()
 
 
 @router.post("/")
