@@ -6,7 +6,7 @@ Your goal is to analyze the provided image and extract its transactional data in
 
 ## Output JSON Structure
 Return a JSON object with these exact 5 keys:
-1. "amount" (integer): The total amount spent. Extract only the numeric value, ignoring currency symbols.
+1. "amount" (float): The total amount spent. Extract only the numeric value, ignoring currency symbols.
 2. "date_time" (string): Format strictly as "YYYY-MM-DD HH:MM:SS".
    - If the voucher only shows a partial date (e.g., "26 Jun"), assume the year is 2026 ("2026-06-26").
    - If the exact time is missing seconds, default them to ":00".
