@@ -2,6 +2,7 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import colorlog
 
@@ -13,6 +14,7 @@ LOGS_DIR.mkdir(exist_ok=True)
 LOG_FILE = LOGS_DIR / "bot.log"
 PROMPT_TEMPLATE_PATH = PROJECT_ROOT / "src" / "templates" / "voucher_prompt.md"
 LLM_MODEL = os.getenv("LLM_MODEL")
+TIMEZONE = os.getenv("TIMEZONE")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") or ""
 ALLOWED_USERS = {
     int(uid) for uid in os.getenv("ALLOWED_USERS", "").split(",") if uid.strip()
@@ -57,6 +59,15 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("bot_finanzas")
+
+if TIMEZONE:
+    TIMEZONE = ZoneInfo(TIMEZONE)
+else:
+    logger.critical(
+        "❌ CRITICAL CONFIGURATION ERROR: 'TIMEZONE' environment variable isempty. "
+        "Please specify a valid TIMEZONE in your mise.local.toml."
+    )
+    raise RuntimeError("Missing required environment variable: TIMEZONE")
 
 if not LLM_MODEL:
     logger.critical(

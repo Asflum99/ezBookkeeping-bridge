@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Any, cast
 
-from config import logger
+from config import TIMEZONE, logger
 
 
 def validate_and_sanitize_voucher_data(raw_llm_data: dict[str, Any]) -> dict[str, Any]:
@@ -31,7 +31,7 @@ def validate_and_sanitize_voucher_data(raw_llm_data: dict[str, Any]) -> dict[str
     if not sanitized_data.get("comment"):
         sanitized_data["comment"] = ""
 
-    now = datetime.now()
+    now = datetime.now(TIMEZONE)
     two_weeks_ago = now - timedelta(days=14)
     fallback_date_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -45,7 +45,9 @@ def validate_and_sanitize_voucher_data(raw_llm_data: dict[str, Any]) -> dict[str
         return sanitized_data
 
     try:
-        extracted_date = datetime.strptime(extracted_date_str, "%Y-%m-%d %H:%M:%S")
+        extracted_date = datetime.strptime(
+            extracted_date_str, "%Y-%m-%d %H:%M:%S"
+        ).replace(tzinfo=TIMEZONE)
 
         if two_weeks_ago <= extracted_date <= now:
             logger.debug(f"Voucher date successfully validated: {extracted_date_str}")
@@ -77,11 +79,13 @@ def prepare_confirmation_message(sanitized_data: dict[str, Any]) -> str:
     date_time_str = cast(str, sanitized_data.get("date_time"))
 
     try:
-        parsed_date = datetime.strptime(date_time_str, "%Y-%m-%d %H:%M:%S")
+        parsed_date = datetime.strptime(date_time_str, "%Y-%m-%d %H:%M:%S").replace(
+            tzinfo=TIMEZONE
+        )
         formatted_date = parsed_date.strftime("%d-%m-%Y %I:%M %p")
     except (ValueError, TypeError) as e:
         logger.warning(f"⚠️ Failed to format date for user message: {e}")
-        now = datetime.now()
+        now = datetime.now(TIMEZONE)
         formatted_date = now.strftime("%d-%m-%Y %I:%M %p")
 
     payment_method_raw = sanitized_data.get("payment_method", "")

@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from config import TIMEZONE
 from formatter import (
     prepare_confirmation_message,
     validate_and_sanitize_voucher_data,
@@ -12,7 +13,7 @@ class TestValidateAndSanitizeVoucherData:
     """Unit tests for validating and sanitizing LLM extracted voucher data."""
 
     def test_valid_data_passes_through(self):
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_str = datetime.now(TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
         data = {
             "amount": 25,
             "date_time": now_str,
@@ -71,10 +72,10 @@ class TestValidateAndSanitizeVoucherData:
         result = validate_and_sanitize_voucher_data(data)
 
         assert "date_time" in result
-        assert datetime.strptime(result["date_time"], "%Y-%m-%d %H:%M:%S")
+        assert datetime.strptime(result["date_time"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=TIMEZONE)
 
     def test_date_out_of_range_falls_back(self):
-        old_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+        old_date = (datetime.now(TIMEZONE) - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
         data = {
             "date_time": old_date,
             "amount": 10,
@@ -87,7 +88,7 @@ class TestValidateAndSanitizeVoucherData:
         assert result["date_time"] != old_date
 
     def test_future_date_falls_back(self):
-        future_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+        future_date = (datetime.now(TIMEZONE) + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
         data = {
             "date_time": future_date,
             "amount": 10,
@@ -115,7 +116,7 @@ class TestValidateAndSanitizeVoucherData:
 
         result = validate_and_sanitize_voucher_data(data)
 
-        assert datetime.strptime(result["date_time"], "%Y-%m-%d %H:%M:%S")
+        assert datetime.strptime(result["date_time"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=TIMEZONE)
 
     def test_does_not_mutate_original(self):
         """Verify that the original input dictionary is not modified (immutability)."""
@@ -167,7 +168,7 @@ class TestValidateAndSanitizeVoucherData:
 
     def test_missing_comment_defaults_to_empty_string(self):
         """Verify that missing comment defaults to empty string."""
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_str = datetime.now(TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
         data = {
             "amount": 10,
             "date_time": now_str,
