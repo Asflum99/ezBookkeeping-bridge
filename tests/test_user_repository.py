@@ -2,7 +2,7 @@ import sqlite3
 
 import pytest
 
-from database import SCHEMA, MIGRATIONS, get_db
+from database import MIGRATIONS, SCHEMA, get_db
 from repositories.user_repository import UserRepository
 
 
@@ -58,7 +58,9 @@ class TestGetUser:
         assert result["nombre"] == "Test User"
         assert result["ez_token"] == "fake-token"
         assert result["cuentas"] == {"billetera_digital": "acc-123"}
-        assert result["cuentas_hints"] == [("billetera_digital", "Yape, BCP Transfer, purple")]
+        assert result["cuentas_hints"] == [
+            ("billetera_digital", "Yape, BCP Transfer, purple")
+        ]
         assert result["categorias"] == {"Comida": "cat-456"}
 
     def test_returns_empty_accounts_and_categories(self, repo, db):
