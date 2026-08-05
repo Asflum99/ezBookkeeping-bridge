@@ -20,7 +20,7 @@ VALID_USER_INFO = {
 SANITIZED_DATA = {
     "amount": 25.50,
     "date_time": "2026-07-19 12:30:00",
-    "payment_method": "billetera_digital",
+    "payment_account": "billetera_digital",
     "category": "Comida",
     "comment": "Tambo",
 }

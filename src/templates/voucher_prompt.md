@@ -10,11 +10,13 @@ Return a JSON object with these exact 5 keys:
 2. "date_time" (string): Format strictly as "YYYY-MM-DD HH:MM:SS".
    - If the voucher only shows a partial date (e.g., "26 Jun"), assume the year is 2026 ("2026-06-26").
    - If the exact time is missing seconds, default them to ":00".
-3. "payment_method" (string): Analyze the transfer source and classify it strictly as:
-   - "billetera_digital": If paid via Yape, Plin, standard transfer, or debit card.
-   - "tarjeta_credito": If the voucher explicitly mentions a credit card, installments, or BCP/Visa Crédito.
+3. "payment_account" (string): Classify the transfer source into ONE of the exact allowed account keys listed below.
 4. "category" (string): Classify the expense into ONE of the exact allowed categories listed below.
 5. "comment" (string): Extract a short, concise name of the business, establishment, or recipient person (e.g., "Inkafarma", "Tambo", "Siete Sopas").
+
+## Allowed Payment Accounts
+Select ONE of these exact allowed keys based on the hints provided:
+{accounts_list}
 
 ## Allowed Categories
 You must classify the expense into ONE of these exact categories:
@@ -25,7 +27,7 @@ If you process a Yape screenshot to "Tambo" for 15 Soles on June 29th at 6:28 PM
 {{
     "amount": 15,
     "date_time": "2026-06-29 18:28:00",
-    "payment_method": "billetera_digital",
+    "payment_account": "billetera_digital",
     "category": "Comida",
     "comment": "Tambo"
 }}

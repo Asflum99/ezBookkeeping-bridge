@@ -17,7 +17,7 @@ class TestValidateAndSanitizeVoucherData:
         data = {
             "amount": 25,
             "date_time": now_str,
-            "payment_method": "billetera_digital",
+            "payment_account": "billetera_digital",
             "category": "Comida",
         }
 
@@ -32,19 +32,19 @@ class TestValidateAndSanitizeVoucherData:
             {
                 "amount": None,
                 "date_time": "2026-07-19 12:00:00",
-                "payment_method": "billetera_digital",
+                "payment_account": "billetera_digital",
                 "category": "Comida",
             },
             {
                 "amount": 0,
                 "date_time": "2026-07-19 12:00:00",
-                "payment_method": "billetera_digital",
+                "payment_account": "billetera_digital",
                 "category": "Comida",
             },
             {
                 "amount": -15.50,
                 "date_time": "2026-07-19 12:00:00",
-                "payment_method": "billetera_digital",
+                "payment_account": "billetera_digital",
                 "category": "Comida",
             },
             {"date_time": "2026-07-19 12:00:00"},
@@ -65,7 +65,7 @@ class TestValidateAndSanitizeVoucherData:
         data = {
             "date_time": None,
             "amount": 10,
-            "payment_method": "billetera_digital",
+            "payment_account": "billetera_digital",
             "category": "Comida",
         }
 
@@ -79,7 +79,7 @@ class TestValidateAndSanitizeVoucherData:
         data = {
             "date_time": old_date,
             "amount": 10,
-            "payment_method": "billetera_digital",
+            "payment_account": "billetera_digital",
             "category": "Comida",
         }
 
@@ -92,7 +92,7 @@ class TestValidateAndSanitizeVoucherData:
         data = {
             "date_time": future_date,
             "amount": 10,
-            "payment_method": "billetera_digital",
+            "payment_account": "billetera_digital",
             "category": "Comida",
         }
 
@@ -110,7 +110,7 @@ class TestValidateAndSanitizeVoucherData:
         data = {
             "date_time": invalid_date,
             "amount": 10,
-            "payment_method": "billetera_digital",
+            "payment_account": "billetera_digital",
             "category": "Comida",
         }
 
@@ -123,7 +123,7 @@ class TestValidateAndSanitizeVoucherData:
         original = {
             "date_time": "invalid",
             "amount": 10,
-            "payment_method": "billetera_digital",
+            "payment_account": "billetera_digital",
             "category": "Comida",
         }
 
@@ -133,16 +133,16 @@ class TestValidateAndSanitizeVoucherData:
         assert "comment" not in original
 
     @pytest.mark.parametrize(
-        "invalid_payment_method",
+        "invalid_payment_account",
         [None, "", 0],
         ids=["none", "empty_string", "zero"],
     )
-    def test_missing_payment_method_raises_value_error(self, invalid_payment_method):
-        """Verify that missing, empty, or falsy payment_method raises a ValueError."""
+    def test_missing_payment_account_raises_value_error(self, invalid_payment_account):
+        """Verify that missing, empty, or falsy payment_account raises a ValueError."""
         data = {
             "amount": 10,
             "date_time": "2026-07-19 12:00:00",
-            "payment_method": invalid_payment_method,
+            "payment_account": invalid_payment_account,
             "category": "Comida",
         }
 
@@ -159,7 +159,7 @@ class TestValidateAndSanitizeVoucherData:
         data = {
             "amount": 10,
             "date_time": "2026-07-19 12:00:00",
-            "payment_method": "billetera_digital",
+            "payment_account": "billetera_digital",
             "category": invalid_category,
         }
 
@@ -172,7 +172,7 @@ class TestValidateAndSanitizeVoucherData:
         data = {
             "amount": 10,
             "date_time": now_str,
-            "payment_method": "billetera_digital",
+            "payment_account": "billetera_digital",
             "category": "Comida",
         }
 
@@ -189,7 +189,7 @@ class TestPrepareConfirmationMessage:
             "amount": 25.50,
             "comment": "Almuerzo",
             "date_time": "2026-07-19 12:30:00",
-            "payment_method": "billetera_digital",
+            "payment_account": "billetera_digital",
             "category": "Comida",
         }
         msg = prepare_confirmation_message(data)
@@ -202,7 +202,7 @@ class TestPrepareConfirmationMessage:
         msg = prepare_confirmation_message({"amount": 10})
         assert "Desconocido" in msg
 
-    def test_unknown_payment_method(self):
-        data = {"amount": 10, "payment_method": "efectivo"}
+    def test_unknown_payment_account(self):
+        data = {"amount": 10, "payment_account": "efectivo"}
         msg = prepare_confirmation_message(data)
         assert "Desconocido" in msg

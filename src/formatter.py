@@ -18,8 +18,8 @@ def validate_and_sanitize_voucher_data(raw_llm_data: dict[str, Any]) -> dict[str
         )
         raise ValueError("Amount is required but not provided.")
 
-    payment_method = sanitized_data.get("payment_method")
-    if not payment_method:
+    payment_account = sanitized_data.get("payment_account")
+    if not payment_account:
         logger.error("Payment method is missing from LLM extraction.")
         raise ValueError("Payment method is required but not provided.")
 
@@ -88,13 +88,13 @@ def prepare_confirmation_message(sanitized_data: dict[str, Any]) -> str:
         now = datetime.now(TIMEZONE)
         formatted_date = now.strftime("%d-%m-%Y %I:%M %p")
 
-    payment_method_raw = sanitized_data.get("payment_method", "")
-    translated_payment_methods = {
+    payment_account_raw = sanitized_data.get("payment_account", "")
+    translated_payment_accounts = {
         "billetera_digital": "📱 Billetera Digital (Yape/Plin/Débito)",
         "tarjeta_credito": "💳 Tarjeta de Crédito",
     }
-    payment_method_friendly = translated_payment_methods.get(
-        payment_method_raw, "❓ Desconocido"
+    payment_account_friendly = translated_payment_accounts.get(
+        payment_account_raw, "❓ Desconocido"
     )
 
     category_name = sanitized_data.get("category", "❓ Desconocida")
@@ -104,7 +104,7 @@ def prepare_confirmation_message(sanitized_data: dict[str, Any]) -> str:
         f"💰 Monto: S/. {amount}\n"
         f"📝 Descripción: {comment}\n"
         f"📅 Fecha: {formatted_date}\n"
-        f"💳 Método: {payment_method_friendly}\n"
+        f"💳 Método: {payment_account_friendly}\n"
         f"🏷️ Categoría: {category_name}"
     )
     return message
