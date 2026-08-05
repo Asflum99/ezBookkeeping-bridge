@@ -28,11 +28,15 @@ class UserRepository:
 
             # Get accounts
             accounts = {}
+            accounts_with_hints = []
+
             for acc in conn.execute(
-                "SELECT name, ez_account_id FROM user_accounts WHERE user_id = ?",
+                "SELECT name, ez_account_id, hints FROM user_accounts WHERE user_id = ?",
                 (telegram_id,),
             ):
                 accounts[acc["name"]] = acc["ez_account_id"]
+                hint_text = acc["hints"] if acc["hints"] else acc["name"]
+                accounts_with_hints.append((acc["name"], hint_text))
 
             # Get categories
             categories = {}
@@ -46,6 +50,7 @@ class UserRepository:
                 "nombre": nombre,
                 "ez_token": ez_token,
                 "cuentas": accounts,
+                "cuentas_hints": accounts_with_hints,
                 "categorias": categories,
             }
 

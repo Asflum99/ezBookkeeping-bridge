@@ -2,7 +2,7 @@ import sqlite3
 
 import pytest
 
-from database import SCHEMA, get_db
+from database import SCHEMA, MIGRATIONS, get_db
 from repositories.user_repository import UserRepository
 
 
@@ -14,6 +14,12 @@ def db(tmp_path):
     # Create tables
     conn = sqlite3.connect(str(db_path))
     conn.executescript(SCHEMA)
+    v = conn.execute("PRAGMA user_version").fetchone()[0]
+    for to, sql in MIGRATIONS:
+        if v < to:
+            conn.executescript(sql)
+            conn.execute(f"PRAGMA user_version = {to}")
+    conn.commit()
     conn.close()
 
     return str(db_path)
@@ -38,8 +44,8 @@ class TestGetUser:
                 (12345, "Test User", "fake-token"),
             )
             conn.execute(
-                "INSERT INTO user_accounts (user_id, name, ez_account_id) VALUES (?, ?, ?)",
-                (12345, "billetera_digital", "acc-123"),
+                "INSERT INTO user_accounts (user_id, name, ez_account_id, hints) VALUES (?, ?, ?, ?)",
+                (12345, "billetera_digital", "acc-123", "Yape, BCP Transfer, purple"),
             )
             conn.execute(
                 "INSERT INTO user_categories (user_id, name, ez_category_id) VALUES (?, ?, ?)",
@@ -52,6 +58,7 @@ class TestGetUser:
         assert result["nombre"] == "Test User"
         assert result["ez_token"] == "fake-token"
         assert result["cuentas"] == {"billetera_digital": "acc-123"}
+        assert result["cuentas_hints"] == [("billetera_digital", "Yape, BCP Transfer, purple")]
         assert result["categorias"] == {"Comida": "cat-456"}
 
     def test_returns_empty_accounts_and_categories(self, repo, db):
@@ -64,4 +71,5 @@ class TestGetUser:
         result = repo.get_user(12345)
 
         assert result["cuentas"] == {}
+        assert result["cuentas_hints"] == []
         assert result["categorias"] == {}

@@ -28,12 +28,23 @@ CREATE TABLE IF NOT EXISTS user_categories (
 );
 """
 
+MIGRATIONS = [
+    (1, "ALTER TABLE user_accounts ADD COLUMN hints TEXT NOT NULL DEFAULT ''"),
+]
 
-def init_db(db_path: Path = DATABASE_PATH) -> None:
+
+def init_db(
+    db_path: Path = DATABASE_PATH, migrations: list[tuple] = MIGRATIONS
+) -> None:
     """Create tables if they don't exist."""
     conn = sqlite3.connect(db_path)
     try:
         conn.executescript(SCHEMA)
+        v = conn.execute("PRAGMA user_version").fetchone()[0]
+        for to, sql in migrations:
+            if v < to:
+                conn.executescript(sql)
+                conn.execute(f"PRAGMA user_version = {to}")
         conn.commit()
         logger.info(f"Database initialized at {db_path}")
     finally:
