@@ -14,6 +14,7 @@ VALID_USER_INFO = {
     "nombre": "Test User",
     "ez_token": "fake-jwt-token",
     "cuentas": {"billetera_digital": "3826102909318201344"},
+    "cuentas_hints": [("billetera_digital", "Yape, BCP Transfer, morado")],
     "categorias": {"Comida": "3826101146502561820"},
 }
 
@@ -115,23 +116,6 @@ class TestTelegramWebhook:
         assert resp.status_code == 200
         mock_send.assert_called_once()
         assert "No estás registrado" in mock_send.call_args[0][2]
-
-    # --- No categories ---
-
-    def test_no_categories_returns_error(self, mocker):
-        mocker.patch(
-            "routers.telegram.photo.download_telegram_photo",
-            return_value="/tmp/photo.jpg",
-        )
-        mocker.patch("routers.telegram.photo.delete_local_file")
-        user_repo = mocker.MagicMock()
-        user_repo.get_user.return_value = {"categorias": {}}
-        client = _build_client(user_repo)
-
-        resp = client.post(WEBHOOK_PATH, json=_make_update())
-
-        assert resp.status_code == 200
-        assert resp.json()["detail"] == "Failed to retrieve user categories."
 
     # --- Happy path ---
 

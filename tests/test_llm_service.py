@@ -14,30 +14,39 @@ from services.llm_service import (
 
 
 class TestBuildSystemPrompt:
-    def test_single_category(self):
-        result = build_system_prompt(["Comida"])
+    def test_categories_and_accounts_injection(self):
+        categories = ["Comida", "Transporte"]
+        accounts = [
+            ("BCP Débito", "Yape, morado"),
+            ("Interbank Débito", "Plin, verde"),
+        ]
+
+        result = build_system_prompt(categories, accounts)
 
         assert "- Comida" in result
-        assert "Allowed Categories" in result
-
-    def test_multiple_categories(self):
-        result = build_system_prompt(["Comida", "Ropa", "Transporte"])
-
-        assert "- Comida" in result
-        assert "- Ropa" in result
         assert "- Transporte" in result
-
-    def test_empty_categories(self):
-        result = build_system_prompt([])
+        assert '- "BCP Débito": Matches Yape, morado' in result
+        assert '- "Interbank Débito": Matches Plin, verde' in result
 
         assert "{categories_list}" not in result
+        assert "{accounts_list}" not in result
+
+    def test_empty_categories_and_accounts(self):
+        result = build_system_prompt([], [])
+
+        assert "{categories_list}" not in result
+        assert "{accounts_list}" not in result
         assert "Allowed Categories" in result
+        assert "Allowed Payment Accounts" in result
 
-    def test_special_characters(self):
-        result = build_system_prompt(["Café & Té", "Niños"])
+    def test_special_characters_in_accounts_and_hints(self):
+        categories = ["Niños"]
+        accounts = [("Línea 1 Tren", "Tren Lima, estación & tarjeta")]
 
-        assert "- Café & Té" in result
+        result = build_system_prompt(categories, accounts)
+
         assert "- Niños" in result
+        assert '- "Línea 1 Tren": Matches Tren Lima, estación & tarjeta' in result
 
 
 class TestGetLlm:
@@ -200,7 +209,11 @@ class TestBuildMessages:
 class TestProcessExpenseWithAi:
     def test_file_not_found(self):
         with pytest.raises(FileNotFoundError):
-            process_expense_with_ai("/nonexistent/path.jpg", ["Comida"])
+            process_expense_with_ai(
+                "/nonexistent/path.jpg",
+                ["Comida"],
+                [("BCP Débito", "Yape, BCP transfer, morado")],
+            )
 
     def test_calls_llm_with_correct_messages(self, tmp_path, mocker):
         mocker.patch("services.llm_service._PARSER")
@@ -222,7 +235,11 @@ class TestProcessExpenseWithAi:
         image_file = tmp_path / "test.jpg"
         image_file.write_bytes(b"fake image")
 
-        result = process_expense_with_ai(str(image_file), ["Comida", "Ropa"])
+        result = process_expense_with_ai(
+            str(image_file),
+            ["Comida", "Ropa"],
+            [("BCP Débito", "Yape, BCP transfer, morado")],
+        )
 
         assert result == {"amount": 100}
         final_parser.invoke.assert_called_once()
@@ -230,3 +247,5 @@ class TestProcessExpenseWithAi:
         assert isinstance(messages[0], SystemMessage)
         assert "Comida" in messages[0].content
         assert "Ropa" in messages[0].content
+        assert "BCP Débito" in messages[0].content
+        assert "Yape, BCP transfer, morado" in messages[0].content
