@@ -105,3 +105,33 @@ async def register_transaction(
     except Exception as e:
         logger.exception(f"❌ Unexpected error in register_transaction: {e}")
         return False
+
+
+async def get_user_accounts(ez_token: str) -> list[dict] | None:
+    """Fetch all accounts from ezBookkeeping for the given user."""
+    url = f"{EZBOOKKEEPING_URL}/api/v1/accounts/list.json"
+    headers = {"Authorization": f"Bearer {ez_token}"}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, timeout=10.0)
+
+            if response.status_code != 200:
+                logger.error(
+                    f"ezBookkeeping accounts API error. Status: {response.status_code}"
+                )
+                return None
+
+            res_json = response.json()
+            if not res_json.get("success"):
+                logger.error("ezBookkeeping accounts API returned success=false")
+                return None
+
+            return res_json["result"]
+
+    except httpx.HTTPError as e:
+        logger.exception(f"Network or HTTP error fetching accounts: {e}")
+        return None
+    except (ValueError, KeyError) as e:
+        logger.exception(f"Invalid JSON payload received from ezBookkeeping: {e}")
+        return None
