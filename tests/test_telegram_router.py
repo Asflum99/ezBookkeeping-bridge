@@ -2,6 +2,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from routers.telegram import router
+from routers.telegram.webhook import get_user_repository
+
 SAMPLE_PHOTO = {
     "file_id": "photo_large_id",
     "file_unique_id": "uniq_large",
@@ -47,8 +50,6 @@ def _make_update(**overrides):
 
 def _build_client(user_repo_mock):
     """Create a TestClient with a mocked UserRepository."""
-    from routers.telegram.webhook import get_user_repository
-    from routers.telegram import router
 
     app = FastAPI()
     app.include_router(router)
