@@ -18,11 +18,17 @@ from config import (
 )
 
 
-def build_system_prompt(user_categories: list[str]) -> str:
+def build_system_prompt(
+    user_categories: list[str], user_accounts: list[tuple[str, str]]
+) -> str:
     """Format the cached prompt template with user categories."""
     formatted_categories = "\n".join(f"- {cat}" for cat in user_categories)
+    formatted_accounts = "\n".join(
+        f'- "{name}": Matches {hints}' for name, hints in user_accounts
+    )
+    logger.debug(f"Rendered accounts in prompt:\n{formatted_accounts}")
     return SYSTEM_PROMPT_TEMPLATE.format(
-        categories_list=formatted_categories, accounts_list=""
+        categories_list=formatted_categories, accounts_list=formatted_accounts
     )
 
 
@@ -99,7 +105,9 @@ def _build_messages(base64_image: str, system_prompt: str) -> list:
 
 
 def process_expense_with_ai(
-    local_photo_path: str, user_categories: list[str]
+    local_photo_path: str,
+    user_categories: list[str],
+    user_accounts: list[tuple[str, str]],
 ) -> dict[str, Any]:
     """
     Encodes the local voucher image to base64, sends it to the LLM via LangChain
@@ -115,7 +123,7 @@ def process_expense_with_ai(
         raise
 
     try:
-        system_prompt_text = build_system_prompt(user_categories)
+        system_prompt_text = build_system_prompt(user_categories, user_accounts)
         messages = _build_messages(base64_image, system_prompt_text)
 
         logger.debug("Sending payload to Vision Model via LangChain...")

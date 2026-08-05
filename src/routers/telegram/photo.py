@@ -51,16 +51,11 @@ async def handle_photo(
         local_photo_path = await download_telegram_photo(token, file_id)
 
         user_categories = list(user_info.get("categorias", {}).keys())
-        if not user_categories:
-            logger.error(
-                f"Cannot process voucher: No categories found for user {user_id}"
-            )
-            return {
-                "status": "success",
-                "detail": "Failed to retrieve user categories.",
-            }
+        user_accounts_hints = list(user_info.get("cuentas_hints", []))
 
-        raw_llm_data = process_expense_with_ai(local_photo_path, user_categories)
+        raw_llm_data = process_expense_with_ai(
+            local_photo_path, user_categories, user_accounts_hints
+        )
         sanitized_data = validate_and_sanitize_voucher_data(raw_llm_data)
 
         transaction_registered = await register_transaction(sanitized_data, user_info)
