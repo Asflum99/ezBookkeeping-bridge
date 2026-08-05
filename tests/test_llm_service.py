@@ -1,4 +1,5 @@
 import base64
+import builtins
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -130,6 +131,24 @@ class TestGetLlm:
         monkeypatch.setattr("services.llm_service.LLM_PROVIDER", "unsupported")
 
         with pytest.raises(ValueError, match="Unsupported LLM provider"):
+            _get_llm()
+
+    def test_missing_provider_module_raises_runtime_error(self, monkeypatch):
+        monkeypatch.setattr("services.llm_service.LLM_PROVIDER", "groq")
+        monkeypatch.setattr("services.llm_service.LLM_MODEL", "test-model")
+        monkeypatch.setattr("services.llm_service.LLM_API_KEY", "test-key")
+
+        # Patch __import__ to raise ModuleNotFoundError for langchain_groq
+        original_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "langchain_groq":
+                raise ModuleNotFoundError("No module named 'langchain_groq'")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr("builtins.__import__", mock_import)
+
+        with pytest.raises(RuntimeError, match="Missing dependency"):
             _get_llm()
 
 
