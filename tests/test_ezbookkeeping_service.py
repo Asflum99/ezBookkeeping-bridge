@@ -9,7 +9,7 @@ class TestRegisterTransaction:
     VALID_SANITIZED_DATA = {
         "amount": 25.50,
         "date_time": "2026-07-19 12:30:00",
-        "payment_method": "billetera_digital",
+        "payment_account": "billetera_digital",
         "category": "Comida",
         "comment": "Tambo",
     }
@@ -30,14 +30,14 @@ class TestRegisterTransaction:
         "sanitized_data, user_info",
         [
             (
-                {"payment_method": "billetera_digital"},
+                {"payment_account": "billetera_digital"},
                 {
                     "categorias": {"Comida": "123"},
                     "cuentas": {"billetera_digital": "321"},
                 },
             ),
             (
-                {"category": "Ropa", "payment_method": "billetera_digital"},
+                {"category": "Ropa", "payment_account": "billetera_digital"},
                 {
                     "categorias": {"Comida": "123"},
                     "cuentas": {"billetera_digital": "321"},
@@ -58,14 +58,14 @@ class TestRegisterTransaction:
                 {"categorias": {"Comida": "123"}},
             ),
             (
-                {"category": "Comida", "payment_method": "efectivo"},
+                {"category": "Comida", "payment_account": "efectivo"},
                 {
                     "categorias": {"Comida": "123"},
                     "cuentas": {"billetera_digital": "321"},
                 },
             ),
         ],
-        ids=["missing_payment_method", "payment_method_not_in_user_accounts"],
+        ids=["missing_payment_account", "payment_account_not_in_user_accounts"],
     )
     async def test_account_lookup_fails(self, sanitized_data, user_info):
         result = await register_transaction(sanitized_data, user_info)

@@ -21,7 +21,9 @@ from config import (
 def build_system_prompt(user_categories: list[str]) -> str:
     """Format the cached prompt template with user categories."""
     formatted_categories = "\n".join(f"- {cat}" for cat in user_categories)
-    return SYSTEM_PROMPT_TEMPLATE.format(categories_list=formatted_categories)
+    return SYSTEM_PROMPT_TEMPLATE.format(
+        categories_list=formatted_categories, accounts_list=""
+    )
 
 
 @lru_cache(1)

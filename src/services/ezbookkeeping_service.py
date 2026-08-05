@@ -17,7 +17,7 @@ async def register_transaction(
     - amount: int (cents, > 0)
     - date_time: str ("%Y-%m-%d %H:%M:%S", America/Lima)
     - category: str (valid category name)
-    - payment_method: str (valid account name)
+    - payment_account: str (valid account name)
     - comment: str
     """
     logger.info("Starting transaction registration in ezBookkeeping.")
@@ -34,18 +34,18 @@ async def register_transaction(
         )
         return False
 
-    payment_method = sanitized_data.get("payment_method")
+    payment_account = sanitized_data.get("payment_account")
     user_accounts = user_info.get("cuentas", {})
 
-    source_account_id = user_accounts.get(payment_method)
+    source_account_id = user_accounts.get(payment_account)
     if not source_account_id:
         logger.error(
-            f"❌ Failed to resolve source account ID for payment method: '{payment_method}'. "
+            f"❌ Failed to resolve source account ID for payment method: '{payment_account}'. "
             f"Available user accounts: {list(user_accounts.keys())}"
         )
         return False
 
-    amount_cents = int(round(float(sanitized_data["amount"]) * 100))
+    amount_cents = round(float(sanitized_data["amount"]) * 100)
 
     iso_time_str = cast(str, sanitized_data["date_time"])
     parsed_datetime = datetime.strptime(iso_time_str, "%Y-%m-%d %H:%M:%S").replace(
