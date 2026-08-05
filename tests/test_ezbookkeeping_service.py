@@ -1,12 +1,21 @@
+from typing import ClassVar
+
 import httpx
 import pytest
 import respx
 
-from services.ezbookkeeping_service import register_transaction
+from services.ezbookkeeping_service import get_user_accounts, register_transaction
+
+
+@pytest.fixture(autouse=True)
+def mock_ezbookkeeping_url(monkeypatch):
+    monkeypatch.setattr(
+        "services.ezbookkeeping_service.EZBOOKKEEPING_URL", "http://test"
+    )
 
 
 class TestRegisterTransaction:
-    VALID_SANITIZED_DATA = {
+    VALID_SANITIZED_DATA: ClassVar = {
         "amount": 25.50,
         "date_time": "2026-07-19 12:30:00",
         "payment_account": "billetera_digital",
@@ -14,17 +23,11 @@ class TestRegisterTransaction:
         "comment": "Tambo",
     }
 
-    VALID_USER_INFO = {
+    VALID_USER_INFO: ClassVar = {
         "ez_token": "fake-jwt-token",
         "cuentas": {"billetera_digital": "3826102909318201344"},
         "categorias": {"Comida": "3826101146502561820"},
     }
-
-    @pytest.fixture(autouse=True)
-    def mock_ezbookkeeping_url(self, monkeypatch):
-        monkeypatch.setattr(
-            "services.ezbookkeeping_service.EZBOOKKEEPING_URL", "http://test"
-        )
 
     @pytest.mark.parametrize(
         "sanitized_data, user_info",
@@ -142,3 +145,49 @@ class TestRegisterTransaction:
         )
 
         assert result is False
+
+
+class TestGetUserAccounts:
+    @respx.mock
+    async def test_success(self):
+        respx.get("http://test/api/v1/accounts/list.json").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "result": [
+                        {"id": "acc-1", "name": "BCP"},
+                        {"id": "acc-2", "name": "Yape"},
+                    ],
+                },
+            )
+        )
+        result = await get_user_accounts("fake-token")
+        assert result == [
+            {"id": "acc-1", "name": "BCP"},
+            {"id": "acc-2", "name": "Yape"},
+        ]
+
+    @respx.mock
+    async def test_api_returns_non_200(self):
+        respx.get("http://test/api/v1/accounts/list.json").mock(
+            return_value=httpx.Response(401, json={"success": False})
+        )
+        result = await get_user_accounts("fake-token")
+        assert result is None
+
+    @respx.mock
+    async def test_api_returns_success_false(self):
+        respx.get("http://test/api/v1/accounts/list.json").mock(
+            return_value=httpx.Response(200, json={"success": False})
+        )
+        result = await get_user_accounts("fake-token")
+        assert result is None
+
+    @respx.mock
+    async def test_network_error(self):
+        respx.get("http://test/api/v1/accounts/list.json").mock(
+            side_effect=httpx.ConnectError("Connection refused")
+        )
+        result = await get_user_accounts("fake-token")
+        assert result is None
