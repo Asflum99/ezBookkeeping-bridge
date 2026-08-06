@@ -75,3 +75,75 @@ class TestGetUser:
         assert result["cuentas"] == {}
         assert result["cuentas_hints"] == []
         assert result["categorias"] == {}
+
+
+class TestSyncAccounts:
+    def _seed_user(self, conn, telegram_id):
+        conn.execute(
+            "INSERT INTO users (telegram_id, nombre, ez_token) VALUES (?, ?, ?)",
+            (telegram_id, "Test", "tok"),
+        )
+
+    def test_adds_new_accounts(self, db):
+        with get_db(db) as conn:
+            self._seed_user(conn, 12345)
+
+        repo = UserRepository(db_path=db)
+        remote = [{"id": "acc-1", "name": "BCP"}, {"id": "acc-2", "name": "Yape"}]
+
+        result = repo.sync_accounts(12345, remote)
+
+        assert len(result["added"]) == 2
+        assert len(result["removed"]) == 0
+
+    def test_removes_deleted_accounts(self, db):
+        with get_db(db) as conn:
+            self._seed_user(conn, 12345)
+            conn.execute(
+                "INSERT INTO user_accounts (user_id, name, ez_account_id, hints) VALUES (?, ?, ?, ?)",
+                (12345, "BCP", "acc-old", "old hint"),
+            )
+
+        repo = UserRepository(db_path=db)
+        remote = [{"id": "acc-new", "name": "Yape"}]
+
+        result = repo.sync_accounts(12345, remote)
+
+        assert len(result["added"]) == 1
+        assert result["added"][0]["name"] == "Yape"
+        assert len(result["removed"]) == 1
+        assert result["removed"][0] == "BCP"
+
+    def test_rename_deletes_old_adds_new(self, db):
+        with get_db(db) as conn:
+            self._seed_user(conn, 12345)
+            conn.execute(
+                "INSERT INTO user_accounts (user_id, name, ez_account_id, hints) VALUES (?, ?, ?, ?)",
+                (12345, "BCP", "acc-old", "old hint"),
+            )
+
+        repo = UserRepository(db_path=db)
+        remote = [{"id": "acc-new", "name": "BCP (Débito)"}]
+
+        result = repo.sync_accounts(12345, remote)
+
+        assert len(result["added"]) == 1
+        assert result["added"][0]["name"] == "BCP (Débito)"
+        assert len(result["removed"]) == 1
+        assert result["removed"][0] == "BCP"
+
+    def test_no_changes(self, db):
+        with get_db(db) as conn:
+            self._seed_user(conn, 12345)
+            conn.execute(
+                "INSERT INTO user_accounts (user_id, name, ez_account_id, hints) VALUES (?, ?, ?, ?)",
+                (12345, "BCP", "acc-1", "hint"),
+            )
+
+        repo = UserRepository(db_path=db)
+        remote = [{"id": "acc-1", "name": "BCP"}]
+
+        result = repo.sync_accounts(12345, remote)
+
+        assert result["added"] == []
+        assert result["removed"] == []
