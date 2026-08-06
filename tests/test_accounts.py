@@ -1,3 +1,4 @@
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from helpers import VALID_USER_INFO, WEBHOOK_PATH, make_text_update
@@ -13,8 +14,8 @@ def _build_client(user_repo_mock):
 
 
 class TestUpdateAccounts:
-    def test_api_failure(self, mocker):
-        mock_send = mocker.patch("routers.telegram.accounts.send_telegram_message")
+    @pytest.mark.parametrize("mock_send", ["accounts"], indirect=True)
+    def test_api_failure(self, mocker, mock_send):
         user_repo = mocker.MagicMock()
         user_repo.get_user.return_value = VALID_USER_INFO
         client = _build_client(user_repo)
@@ -24,8 +25,8 @@ class TestUpdateAccounts:
         assert resp.status_code == 200
         assert "Error" in mock_send.call_args[0][2]
 
-    def test_happy_path(self, mocker):
-        mock_send = mocker.patch("routers.telegram.accounts.send_telegram_message")
+    @pytest.mark.parametrize("mock_send", ["accounts"], indirect=True)
+    def test_happy_path(self, mocker, mock_send):
         mocker.patch(
             "routers.telegram.accounts.get_user_accounts",
             return_value=[{"id": "acc-1", "name": "BCP"}],
@@ -35,6 +36,7 @@ class TestUpdateAccounts:
         user_repo.sync_accounts.return_value = {
             "added": [{"id": "acc-1", "name": "BCP"}],
             "removed": [],
+            "updated": [],
         }
         client = _build_client(user_repo)
 
