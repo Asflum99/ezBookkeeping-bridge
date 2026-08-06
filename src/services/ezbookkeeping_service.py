@@ -135,3 +135,49 @@ async def get_user_accounts(ez_token: str) -> list[dict] | None:
     except (ValueError, KeyError) as e:
         logger.exception(f"Invalid JSON payload received from ezBookkeeping: {e}")
         return None
+
+
+async def get_user_categories(ez_token: str) -> list[dict] | None:
+    """Fetch expense categories from ezBookkeeping for the given user."""
+    url = f"{settings.ezbookkeeping_url}/api/v1/transaction/categories/list.json"
+    headers = {"Authorization": f"Bearer {ez_token}"}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, timeout=10.0)
+
+            if response.status_code != 200:
+                logger.error(
+                    f"ezBookkeeping categories API error. Status: {response.status_code}"
+                )
+                return None
+
+            res_json = response.json()
+            if not res_json.get("success"):
+                logger.error("ezBookkeeping categories API returned success=false")
+                return None
+
+            # Response is grouped by type: {"1": [...], "2": [...], "3": [...]}
+            # Type 2 = Expense
+            categories_by_type = res_json["result"]
+            expense_categories = categories_by_type.get("2", [])
+
+            # Flatten hierarchy with arrow separator
+            result = []
+
+            def flatten(cats, parent_name=""):
+                for cat in cats:
+                    name = f"{parent_name} > {cat['name']}" if parent_name else cat["name"]
+                    result.append({"id": cat["id"], "name": name})
+                    if cat.get("subCategories"):
+                        flatten(cat["subCategories"], name)
+
+            flatten(expense_categories)
+            return result
+
+    except httpx.HTTPError as e:
+        logger.exception(f"Network or HTTP error fetching categories: {e}")
+        return None
+    except (ValueError, KeyError) as e:
+        logger.exception(f"Invalid JSON payload received from ezBookkeeping: {e}")
+        return None
