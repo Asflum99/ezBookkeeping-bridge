@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from config import logger, settings
 from repositories.user_repository import UserRepository
 from routers.telegram.accounts import handle_update_accounts
+from routers.telegram.categories import handle_update_categories
 from routers.telegram.photo import handle_photo
 from routers.telegram.utils import send_telegram_message
 from schemas import TelegramUpdate
@@ -52,7 +53,14 @@ async def webhook(
         return await handle_photo(payload, user_info, chat_id)
 
     if payload.message.text:
-        return await handle_update_accounts(payload, user_info, chat_id, user_repo)
+        text = payload.message.text.strip()
+        if text == "/update-accounts":
+            return await handle_update_accounts(payload, user_info, chat_id, user_repo)
+        elif text == "/update-categories":
+            return await handle_update_categories(payload, user_info, chat_id, user_repo)
+        else:
+            logger.info(f"Update {payload.update_id} ignored: unknown command '{text}'")
+            return {"status": "success", "detail": "Unknown command"}
 
     logger.info(f"Update {payload.update_id} ignored: no photo or text.")
     return {"status": "success", "detail": "Unsupported message type"}
