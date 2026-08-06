@@ -4,7 +4,11 @@ import httpx
 import pytest
 import respx
 
-from services.ezbookkeeping_service import get_user_accounts, register_transaction
+from services.ezbookkeeping_service import (
+    get_user_accounts,
+    get_user_categories,
+    register_transaction,
+)
 
 
 class TestRegisterTransaction:
@@ -104,7 +108,7 @@ class TestRegisterTransaction:
         assert result is False
 
     @respx.mock
-    async def test_api_returns_200_but_invalid_json(self):
+    async def test_api_returns_200_but_invalid_json(self, _mock_ezbookkeeping_url):
         respx.post("http://test/api/v1/transactions/add.json").mock(
             return_value=httpx.Response(200, text="not json")
         )
@@ -116,7 +120,7 @@ class TestRegisterTransaction:
         assert result is False
 
     @respx.mock
-    async def test_network_error(self):
+    async def test_network_error(self, _mock_ezbookkeeping_url):
         respx.post("http://test/api/v1/transactions/add.json").mock(
             side_effect=httpx.ConnectError("Connection refused")
         )
@@ -183,4 +187,83 @@ class TestGetUserAccounts:
             side_effect=httpx.ConnectError("Connection refused")
         )
         result = await get_user_accounts("fake-token")
+        assert result is None
+
+
+class TestGetUserCategories:
+    @respx.mock
+    async def test_success_flat_categories(self, _mock_ezbookkeeping_url):
+        respx.get("http://test/api/v1/transaction/categories/list.json").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "result": {
+                        "1": [{"id": "inc-1", "name": "Salary", "subCategories": []}],
+                        "2": [
+                            {"id": "exp-1", "name": "Food", "subCategories": []},
+                            {"id": "exp-2", "name": "Transport", "subCategories": []},
+                        ],
+                        "3": [],
+                    },
+                },
+            )
+        )
+        result = await get_user_categories("fake-token")
+        assert result == [
+            {"id": "exp-1", "name": "Food"},
+            {"id": "exp-2", "name": "Transport"},
+        ]
+
+    @respx.mock
+    async def test_success_with_subcategories(self, _mock_ezbookkeeping_url):
+        respx.get("http://test/api/v1/transaction/categories/list.json").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "result": {
+                        "2": [
+                            {
+                                "id": "exp-1",
+                                "name": "Food",
+                                "subCategories": [
+                                    {"id": "sub-1", "name": "Groceries"},
+                                    {"id": "sub-2", "name": "Restaurants"},
+                                ],
+                            }
+                        ],
+                    },
+                },
+            )
+        )
+        result = await get_user_categories("fake-token")
+        assert result == [
+            {"id": "exp-1", "name": "Food"},
+            {"id": "sub-1", "name": "Food > Groceries"},
+            {"id": "sub-2", "name": "Food > Restaurants"},
+        ]
+
+    @respx.mock
+    async def test_api_returns_non_200(self, _mock_ezbookkeeping_url):
+        respx.get("http://test/api/v1/transaction/categories/list.json").mock(
+            return_value=httpx.Response(401, json={"success": False})
+        )
+        result = await get_user_categories("fake-token")
+        assert result is None
+
+    @respx.mock
+    async def test_api_returns_success_false(self, _mock_ezbookkeeping_url):
+        respx.get("http://test/api/v1/transaction/categories/list.json").mock(
+            return_value=httpx.Response(200, json={"success": False})
+        )
+        result = await get_user_categories("fake-token")
+        assert result is None
+
+    @respx.mock
+    async def test_network_error(self, _mock_ezbookkeeping_url):
+        respx.get("http://test/api/v1/transaction/categories/list.json").mock(
+            side_effect=httpx.ConnectError("Connection refused")
+        )
+        result = await get_user_categories("fake-token")
         assert result is None
