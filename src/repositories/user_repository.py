@@ -118,3 +118,63 @@ class UserRepository:
             f"Account sync complete for user {telegram_id}: +{len(added)} -{len(removed)} ~{len(updated)}"
         )
         return {"added": added, "removed": removed, "updated": updated}
+
+    def sync_categories(self, telegram_id: int, remote_categories: list[dict]) -> dict:
+        """Sync local user_categories with remote ezBookkeeping categories."""
+        logger.info(f"Syncing categories for user {telegram_id}")
+        remote_map = {cat["id"]: cat["name"] for cat in remote_categories}
+        remote_ids = set(remote_map.keys())
+        logger.debug(f"Remote ids: {remote_ids}")
+
+        with get_db(self._db_path) as conn:
+            local_rows = conn.execute(
+                "SELECT name, ez_category_id FROM user_categories WHERE user_id = ?",
+                (telegram_id,),
+            ).fetchall()
+
+            local_ids = {row["ez_category_id"] for row in local_rows}
+            logger.debug(f"Local ids: {local_ids}")
+            local_names = {row["ez_category_id"]: row["name"] for row in local_rows}
+            logger.debug(f"Local names: {local_names}")
+
+            # Remove categories no longer in remote
+            to_remove = local_ids - remote_ids
+            for ez_id in to_remove:
+                logger.debug(f"Removing category {ez_id} for user {telegram_id}")
+                conn.execute(
+                    "DELETE FROM user_categories WHERE user_id = ? AND ez_category_id = ?",
+                    (telegram_id, ez_id),
+                )
+
+            # Add categories not in local
+            to_add = remote_ids - local_ids
+            added = []
+            for ez_id in to_add:
+                name = remote_map[ez_id]
+                logger.debug(f"Adding category {name} ({ez_id}) for user {telegram_id}")
+                conn.execute(
+                    "INSERT INTO user_categories (user_id, name, ez_category_id) VALUES (?, ?, ?)",
+                    (telegram_id, name, ez_id),
+                )
+                added.append({"id": ez_id, "name": name})
+
+            # Update categories that exist in both but have different names
+            to_update = local_ids & remote_ids
+            updated = []
+            for ez_id in to_update:
+                local_name = local_names[ez_id]
+                remote_name = remote_map[ez_id]
+                if local_name != remote_name:
+                    logger.debug(f"Updating category {ez_id}: {local_name} → {remote_name}")
+                    conn.execute(
+                        "UPDATE user_categories SET name = ? WHERE user_id = ? AND ez_category_id = ?",
+                        (remote_name, telegram_id, ez_id),
+                    )
+                    updated.append({"id": ez_id, "old_name": local_name, "new_name": remote_name})
+
+            removed = [local_names[eid] for eid in to_remove]
+
+        logger.info(
+            f"Category sync complete for user {telegram_id}: +{len(added)} -{len(removed)} ~{len(updated)}"
+        )
+        return {"added": added, "removed": removed, "updated": updated}

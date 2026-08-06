@@ -150,3 +150,85 @@ class TestSyncAccounts:
         assert result["added"] == []
         assert result["removed"] == []
         assert result["updated"] == []
+
+
+class TestSyncCategories:
+    def _seed_user(self, conn, telegram_id):
+        conn.execute(
+            "INSERT INTO users (telegram_id, nombre, ez_token) VALUES (?, ?, ?)",
+            (telegram_id, "Test", "tok"),
+        )
+
+    def test_adds_new_categories(self, db):
+        with get_db(db) as conn:
+            self._seed_user(conn, 12345)
+
+        repo = UserRepository(db_path=db)
+        remote = [
+            {"id": "cat-1", "name": "Food"},
+            {"id": "cat-2", "name": "Transport"},
+        ]
+
+        result = repo.sync_categories(12345, remote)
+
+        assert len(result["added"]) == 2
+        assert len(result["removed"]) == 0
+        assert len(result["updated"]) == 0
+
+    def test_removes_deleted_categories(self, db):
+        with get_db(db) as conn:
+            self._seed_user(conn, 12345)
+            conn.execute(
+                "INSERT INTO user_categories (user_id, name, ez_category_id) VALUES (?, ?, ?)",
+                (12345, "Food", "cat-old"),
+            )
+
+        repo = UserRepository(db_path=db)
+        remote = [{"id": "cat-new", "name": "Transport"}]
+
+        result = repo.sync_categories(12345, remote)
+
+        assert len(result["added"]) == 1
+        assert result["added"][0]["name"] == "Transport"
+        assert len(result["removed"]) == 1
+        assert result["removed"][0] == "Food"
+        assert len(result["updated"]) == 0
+
+    def test_updates_renamed_category(self, db):
+        with get_db(db) as conn:
+            self._seed_user(conn, 12345)
+            conn.execute(
+                "INSERT INTO user_categories (user_id, name, ez_category_id) VALUES (?, ?, ?)",
+                (12345, "Food", "cat-1"),
+            )
+
+        repo = UserRepository(db_path=db)
+        remote = [{"id": "cat-1", "name": "Food > Groceries"}]
+
+        result = repo.sync_categories(12345, remote)
+
+        assert len(result["added"]) == 0
+        assert len(result["removed"]) == 0
+        assert len(result["updated"]) == 1
+        assert result["updated"][0] == {
+            "id": "cat-1",
+            "old_name": "Food",
+            "new_name": "Food > Groceries",
+        }
+
+    def test_no_changes(self, db):
+        with get_db(db) as conn:
+            self._seed_user(conn, 12345)
+            conn.execute(
+                "INSERT INTO user_categories (user_id, name, ez_category_id) VALUES (?, ?, ?)",
+                (12345, "Food", "cat-1"),
+            )
+
+        repo = UserRepository(db_path=db)
+        remote = [{"id": "cat-1", "name": "Food"}]
+
+        result = repo.sync_categories(12345, remote)
+
+        assert result["added"] == []
+        assert result["removed"] == []
+        assert result["updated"] == []
