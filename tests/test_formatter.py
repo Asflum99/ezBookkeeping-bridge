@@ -72,10 +72,14 @@ class TestValidateAndSanitizeVoucherData:
         result = validate_and_sanitize_voucher_data(data)
 
         assert "date_time" in result
-        assert datetime.strptime(result["date_time"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=settings.timezone)
+        assert datetime.strptime(result["date_time"], "%Y-%m-%d %H:%M:%S").replace(
+            tzinfo=settings.timezone
+        )
 
     def test_date_out_of_range_falls_back(self):
-        old_date = (datetime.now(settings.timezone) - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+        old_date = (datetime.now(settings.timezone) - timedelta(days=30)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
         data = {
             "date_time": old_date,
             "amount": 10,
@@ -88,7 +92,9 @@ class TestValidateAndSanitizeVoucherData:
         assert result["date_time"] != old_date
 
     def test_future_date_falls_back(self):
-        future_date = (datetime.now(settings.timezone) + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+        future_date = (datetime.now(settings.timezone) + timedelta(days=7)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
         data = {
             "date_time": future_date,
             "amount": 10,
@@ -116,7 +122,9 @@ class TestValidateAndSanitizeVoucherData:
 
         result = validate_and_sanitize_voucher_data(data)
 
-        assert datetime.strptime(result["date_time"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=settings.timezone)
+        assert datetime.strptime(result["date_time"], "%Y-%m-%d %H:%M:%S").replace(
+            tzinfo=settings.timezone
+        )
 
     def test_does_not_mutate_original(self):
         """Verify that the original input dictionary is not modified (immutability)."""
@@ -205,4 +213,4 @@ class TestPrepareConfirmationMessage:
     def test_unknown_payment_account(self):
         data = {"amount": 10, "payment_account": "efectivo"}
         msg = prepare_confirmation_message(data)
-        assert "Desconocido" in msg
+        assert "efectivo" in msg

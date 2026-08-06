@@ -88,14 +88,7 @@ def prepare_confirmation_message(sanitized_data: dict[str, Any]) -> str:
         now = datetime.now(settings.timezone)
         formatted_date = now.strftime("%d-%m-%Y %I:%M %p")
 
-    payment_account_raw = sanitized_data.get("payment_account", "")
-    translated_payment_accounts = {
-        "billetera_digital": "📱 Billetera Digital (Yape/Plin/Débito)",
-        "tarjeta_credito": "💳 Tarjeta de Crédito",
-    }
-    payment_account_friendly = translated_payment_accounts.get(
-        payment_account_raw, "❓ Desconocido"
-    )
+    payment_account = sanitized_data.get("payment_account", "❓ Desconocido")
 
     category_name = sanitized_data.get("category", "❓ Desconocida")
 
@@ -104,7 +97,7 @@ def prepare_confirmation_message(sanitized_data: dict[str, Any]) -> str:
         f"💰 Monto: S/. {amount}\n"
         f"📝 Descripción: {comment}\n"
         f"📅 Fecha: {formatted_date}\n"
-        f"💳 Método: {payment_account_friendly}\n"
+        f"💳 Cuenta de pago: {payment_account}\n"
         f"🏷️ Categoría: {category_name}"
     )
     return message
