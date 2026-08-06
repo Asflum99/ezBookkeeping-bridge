@@ -98,9 +98,23 @@ class UserRepository:
                 )
                 added.append({"id": ez_id, "name": name})
 
+            # Update accounts that exist in both but have different names
+            to_update = local_ids & remote_ids
+            updated = []
+            for ez_id in to_update:
+                local_name = local_names[ez_id]
+                remote_name = remote_map[ez_id]
+                if local_name != remote_name:
+                    logger.debug(f"Updating account {ez_id}: {local_name} → {remote_name}")
+                    conn.execute(
+                        "UPDATE user_accounts SET name = ? WHERE user_id = ? AND ez_account_id = ?",
+                        (remote_name, telegram_id, ez_id),
+                    )
+                    updated.append({"id": ez_id, "old_name": local_name, "new_name": remote_name})
+
             removed = [local_names[eid] for eid in to_remove]
 
         logger.info(
-            f"Account sync complete for user {telegram_id}: +{len(added)} -{len(removed)}"
+            f"Account sync complete for user {telegram_id}: +{len(added)} -{len(removed)} ~{len(updated)}"
         )
-        return {"added": added, "removed": removed}
+        return {"added": added, "removed": removed, "updated": updated}

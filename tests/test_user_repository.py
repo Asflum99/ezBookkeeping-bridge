@@ -95,6 +95,7 @@ class TestSyncAccounts:
 
         assert len(result["added"]) == 2
         assert len(result["removed"]) == 0
+        assert len(result["updated"]) == 0
 
     def test_removes_deleted_accounts(self, db):
         with get_db(db) as conn:
@@ -113,24 +114,25 @@ class TestSyncAccounts:
         assert result["added"][0]["name"] == "Yape"
         assert len(result["removed"]) == 1
         assert result["removed"][0] == "BCP"
+        assert len(result["updated"]) == 0
 
-    def test_rename_deletes_old_adds_new(self, db):
+    def test_updates_renamed_account(self, db):
         with get_db(db) as conn:
             self._seed_user(conn, 12345)
             conn.execute(
                 "INSERT INTO user_accounts (user_id, name, ez_account_id, hints) VALUES (?, ?, ?, ?)",
-                (12345, "BCP", "acc-old", "old hint"),
+                (12345, "BCP", "acc-1", "hint"),
             )
 
         repo = UserRepository(db_path=db)
-        remote = [{"id": "acc-new", "name": "BCP (Débito)"}]
+        remote = [{"id": "acc-1", "name": "BCP (Débito)"}]
 
         result = repo.sync_accounts(12345, remote)
 
-        assert len(result["added"]) == 1
-        assert result["added"][0]["name"] == "BCP (Débito)"
-        assert len(result["removed"]) == 1
-        assert result["removed"][0] == "BCP"
+        assert len(result["added"]) == 0
+        assert len(result["removed"]) == 0
+        assert len(result["updated"]) == 1
+        assert result["updated"][0] == {"id": "acc-1", "old_name": "BCP", "new_name": "BCP (Débito)"}
 
     def test_no_changes(self, db):
         with get_db(db) as conn:
@@ -147,3 +149,4 @@ class TestSyncAccounts:
 
         assert result["added"] == []
         assert result["removed"] == []
+        assert result["updated"] == []
