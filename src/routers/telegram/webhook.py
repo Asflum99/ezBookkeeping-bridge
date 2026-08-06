@@ -1,8 +1,9 @@
 from functools import lru_cache
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from config import ALLOWED_USERS, TELEGRAM_BOT_TOKEN, logger
+from config import logger, settings
 from repositories.user_repository import UserRepository
 from routers.telegram.accounts import handle_update_accounts
 from routers.telegram.photo import handle_photo
@@ -18,10 +19,13 @@ def get_user_repository() -> UserRepository:
     return UserRepository()
 
 
+UserRepoDep = Annotated[UserRepository, Depends(get_user_repository)]
+
+
 @router.post("/")
 async def webhook(
     payload: TelegramUpdate,
-    user_repo: UserRepository = Depends(get_user_repository),
+    user_repo: UserRepoDep,
 ):
     """Single webhook endpoint for Telegram updates."""
     if not payload.message:
@@ -31,14 +35,14 @@ async def webhook(
     user_id = payload.message.from_user.id
     chat_id = payload.message.chat.id
 
-    if user_id not in ALLOWED_USERS:
+    if user_id not in settings.allowed_users:
         logger.warning(f"Access denied for Telegram ID: {user_id}")
         raise HTTPException(status_code=403, detail="Unauthorized access")
 
     user_info = user_repo.get_user(user_id)
     if not user_info:
         send_telegram_message(
-            TELEGRAM_BOT_TOKEN,
+            settings.telegram_bot_token,
             chat_id,
             "No estás registrado en el sistema del bot financiero. Pídele al administrador que te agregue.",
         )

@@ -1,6 +1,6 @@
 from typing import cast
 
-from config import TELEGRAM_BOT_TOKEN, logger
+from config import logger, settings
 from repositories.user_repository import UserRepository
 from routers.telegram.utils import send_telegram_message
 from schemas import TelegramMessage, TelegramUpdate
@@ -14,7 +14,7 @@ async def handle_update_accounts(
     user_repo: UserRepository,
 ) -> dict:
     """Sync user_accounts with ezBookkeeping remote accounts."""
-    token = TELEGRAM_BOT_TOKEN
+    token = settings.telegram_bot_token
     message = cast(TelegramMessage, payload.message)
     user_id = message.from_user.id
 

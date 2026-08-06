@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from config import EZBOOKKEEPING_URL, logger
+from config import logger, settings
 
 
 async def register_transaction(
@@ -21,7 +21,7 @@ async def register_transaction(
     - comment: str
     """
     logger.info("Starting transaction registration in ezBookkeeping.")
-    url = f"{EZBOOKKEEPING_URL}/api/v1/transactions/add.json"
+    url = f"{settings.ezbookkeeping_url}/api/v1/transactions/add.json"
 
     category_name = sanitized_data.get("category")
     user_categories = user_info.get("categorias", {})
@@ -109,7 +109,7 @@ async def register_transaction(
 
 async def get_user_accounts(ez_token: str) -> list[dict] | None:
     """Fetch all accounts from ezBookkeeping for the given user."""
-    url = f"{EZBOOKKEEPING_URL}/api/v1/accounts/list.json"
+    url = f"{settings.ezbookkeeping_url}/api/v1/accounts/list.json"
     headers = {"Authorization": f"Bearer {ez_token}"}
 
     try:

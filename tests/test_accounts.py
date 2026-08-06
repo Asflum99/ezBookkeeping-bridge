@@ -1,10 +1,8 @@
-from helpers import VALID_USER_INFO, WEBHOOK_PATH, make_text_update
-from routers.telegram.webhook import get_user_repository
-
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from helpers import VALID_USER_INFO, WEBHOOK_PATH, make_text_update
 
-from routers.telegram import router
+from routers.telegram.webhook import get_user_repository, router
 
 
 def _build_client(user_repo_mock):

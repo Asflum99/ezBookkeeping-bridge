@@ -1,5 +1,7 @@
 import pytest
 
+from config import settings
+
 
 @pytest.fixture
 def mock_send(mocker, request):
@@ -14,15 +16,11 @@ def mock_send(mocker, request):
 
 
 @pytest.fixture(autouse=True)
-def mock_config(mocker):
-    mocker.patch("routers.telegram.webhook.ALLOWED_USERS", {12345})
-    mocker.patch("routers.telegram.webhook.TELEGRAM_BOT_TOKEN", "TOKEN")
-    mocker.patch("routers.telegram.photo.TELEGRAM_BOT_TOKEN", "TOKEN")
-    mocker.patch("routers.telegram.accounts.TELEGRAM_BOT_TOKEN", "TOKEN")
+def mock_config(monkeypatch):
+    monkeypatch.setattr(settings, "telegram_bot_token", "TOKEN")
+    monkeypatch.setattr(settings, "allowed_users_raw", "12345")
 
 
-@pytest.fixture(autouse=True)
-def mock_ezbookkeeping_url(monkeypatch):
-    monkeypatch.setattr(
-        "services.ezbookkeeping_service.EZBOOKKEEPING_URL", "http://test"
-    )
+@pytest.fixture()
+def _mock_ezbookkeeping_url(monkeypatch):
+    monkeypatch.setattr(settings, "ezbookkeeping_url", "http://test")

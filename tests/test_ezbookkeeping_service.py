@@ -68,7 +68,7 @@ class TestRegisterTransaction:
         assert result is False
 
     @respx.mock
-    async def test_success(self):
+    async def test_success(self, _mock_ezbookkeeping_url):
         respx.post("http://test/api/v1/transactions/add.json").mock(
             return_value=httpx.Response(200, json={"success": True})
         )
@@ -142,7 +142,7 @@ class TestRegisterTransaction:
 
 class TestGetUserAccounts:
     @respx.mock
-    async def test_success(self):
+    async def test_success(self, _mock_ezbookkeeping_url):
         respx.get("http://test/api/v1/accounts/list.json").mock(
             return_value=httpx.Response(
                 200,
@@ -162,7 +162,7 @@ class TestGetUserAccounts:
         ]
 
     @respx.mock
-    async def test_api_returns_non_200(self):
+    async def test_api_returns_non_200(self, _mock_ezbookkeeping_url):
         respx.get("http://test/api/v1/accounts/list.json").mock(
             return_value=httpx.Response(401, json={"success": False})
         )
@@ -170,7 +170,7 @@ class TestGetUserAccounts:
         assert result is None
 
     @respx.mock
-    async def test_api_returns_success_false(self):
+    async def test_api_returns_success_false(self, _mock_ezbookkeeping_url):
         respx.get("http://test/api/v1/accounts/list.json").mock(
             return_value=httpx.Response(200, json={"success": False})
         )
@@ -178,7 +178,7 @@ class TestGetUserAccounts:
         assert result is None
 
     @respx.mock
-    async def test_network_error(self):
+    async def test_network_error(self, _mock_ezbookkeeping_url):
         respx.get("http://test/api/v1/accounts/list.json").mock(
             side_effect=httpx.ConnectError("Connection refused")
         )

@@ -2,7 +2,7 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-from config import DATABASE_PATH, logger
+from config import logger, settings
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -34,7 +34,7 @@ MIGRATIONS = [
 
 
 def init_db(
-    db_path: Path = DATABASE_PATH, migrations: list[tuple] = MIGRATIONS
+    db_path: Path = settings.database_path, migrations: list[tuple] = MIGRATIONS
 ) -> None:
     """Create tables if they don't exist."""
     conn = sqlite3.connect(db_path)
@@ -52,7 +52,7 @@ def init_db(
 
 
 @contextmanager
-def get_db(db_path: Path = DATABASE_PATH):
+def get_db(db_path: Path = settings.database_path):
     """Context manager for database connections."""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row

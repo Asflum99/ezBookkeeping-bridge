@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import anyio
 import httpx
 
 from config import PROJECT_ROOT, logger
@@ -37,9 +38,9 @@ async def download_telegram_photo(telegram_bot_token: str, file_id: str) -> str:
 
         async with client.stream("GET", download_url) as stream_response:
             stream_response.raise_for_status()
-            with open(local_destination, "wb") as f:
+            async with await anyio.open_file(local_destination, "wb") as f:
                 async for chunk in stream_response.aiter_bytes():
-                    f.write(chunk)
+                    await f.write(chunk)
 
         logger.info(f"⬇️ File downloaded successfully to: {local_destination}")
         return str(local_destination)

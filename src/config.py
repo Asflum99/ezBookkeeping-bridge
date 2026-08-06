@@ -1,123 +1,130 @@
 import logging
-import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import colorlog
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# --- Main routes ---
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-ACCOUNTS_JSON_PATH = PROJECT_ROOT / "data" / "cuentas.json"
-DATABASE_PATH = PROJECT_ROOT / "data" / "bot.db"
+DATA_DIR = PROJECT_ROOT / "data"
 LOGS_DIR = PROJECT_ROOT / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
-LOG_FILE = LOGS_DIR / "bot.log"
-PROMPT_TEMPLATE_PATH = PROJECT_ROOT / "src" / "templates" / "voucher_prompt.md"
-LLM_MODEL = os.getenv("LLM_MODEL")
-TIMEZONE = os.getenv("TIMEZONE")
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") or ""
-ALLOWED_USERS = {
-    int(uid) for uid in os.getenv("ALLOWED_USERS", "").split(",") if uid.strip()
-}
 
-SUPPORTED_PROVIDERS = {"groq", "openai", "anthropic", "gemini"}
 
-LOG_LEVEL_STR = os.getenv("LOG_LEVEL", "INFO").upper().strip()
-LOG_LEVEL_NUMERIC = getattr(logging, LOG_LEVEL_STR, logging.INFO)
-
-# Log file rotation config
-file_handler = RotatingFileHandler(
-    LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
-)
-file_formatter = logging.Formatter(
-    "[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-file_handler.setFormatter(file_formatter)
-
-# Console output config
-stream_handler = logging.StreamHandler()
-color_formatter = colorlog.ColoredFormatter(
-    # '%(log_color)s' sets color by level
-    # '%(purple)s' is fixed for file location to keep it tidy
-    fmt="%(log_color)s[%(asctime)s] [%(levelname)s]%(reset)s %(purple)s[%(filename)s:%(lineno)d]%(reset)s %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    log_colors={
-        "DEBUG": "cyan",
-        "INFO": "green",
-        "WARNING": "yellow",
-        "ERROR": "red",
-        "CRITICAL": "red,bg_white",
-    },
-)
-stream_handler.setFormatter(color_formatter)
-
-# Logger configuration
-logging.basicConfig(
-    level=LOG_LEVEL_NUMERIC,
-    handlers=[file_handler, stream_handler],
-)
-
-logger = logging.getLogger("bot_finanzas")
-
-if TIMEZONE:
-    TIMEZONE = ZoneInfo(TIMEZONE)
-else:
-    logger.critical(
-        "❌ CRITICAL CONFIGURATION ERROR: 'TIMEZONE' environment variable isempty. "
-        "Please specify a valid TIMEZONE in your mise.local.toml."
-    )
-    raise RuntimeError("Missing required environment variable: TIMEZONE")
-
-if not LLM_MODEL:
-    logger.critical(
-        "❌ CRITICAL CONFIGURATION ERROR: 'LLM_MODEL' environment variable is not defined or is empty. "
-        "Please specify a valid vision model in your mise.local.toml."
-    )
-    raise RuntimeError("Missing required environment variable: LLM_MODEL")
-
-EZBOOKKEEPING_URL = os.getenv("EZBOOKKEEPING_URL")
-if not EZBOOKKEEPING_URL:
-    logger.critical(
-        "❌ ERROR CRÍTICO: La variable de entorno EZBOOKKEEPING_URL no está configurada."
-    )
-    raise RuntimeError("Missing required environment variable: EZBOOKKEEPING_URL")
-
-LLM_PROVIDER = os.getenv("LLM_PROVIDER")
-if not LLM_PROVIDER:
-    logger.critical("❌ CRITICAL CONFIGURATION ERROR: 'LLM_PROVIDER' not configured")
-    raise RuntimeError("Missing required environment variable: LLM_PROVIDER")
-
-if LLM_PROVIDER not in SUPPORTED_PROVIDERS:
-    logger.critical(
-        f"❌ CRITICAL CONFIGURATION ERROR: 'LLM_PROVIDER' value '{LLM_PROVIDER}' is not supported. "
-        f"Must be one of: {', '.join(sorted(SUPPORTED_PROVIDERS))}"
-    )
-    raise RuntimeError(f"Unsupported LLM provider: {LLM_PROVIDER}")
-
-_PROVIDER_API_KEY_MAP = {
-    "groq": "GROQ_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "anthropic": "ANTHROPIC_API_KEY",
-    "gemini": "GOOGLE_API_KEY",
-}
-
-LLM_API_KEY = os.getenv(_PROVIDER_API_KEY_MAP[LLM_PROVIDER])
-if not LLM_API_KEY:
-    logger.critical(
-        f"❌ CRITICAL CONFIGURATION ERROR: API key for provider '{LLM_PROVIDER}' "
-        f"({_PROVIDER_API_KEY_MAP[LLM_PROVIDER]}) is not set."
-    )
-    raise RuntimeError(
-        f"Missing API key for LLM provider: {_PROVIDER_API_KEY_MAP[LLM_PROVIDER]}"
+# --- Config Class ---
+class Settings(BaseSettings):
+    # Routes
+    database_path: Path = DATA_DIR / "bot.db"
+    log_file: Path = LOGS_DIR / "bot.log"
+    prompt_template_path: Path = (
+        PROJECT_ROOT / "src" / "templates" / "voucher_prompt.md"
     )
 
-try:
-    with open(PROMPT_TEMPLATE_PATH, encoding="utf-8") as f:
-        SYSTEM_PROMPT_TEMPLATE = f.read()
-except FileNotFoundError:
-    logger.critical(
-        f"❌ CRITICAL: System prompt template not found at {PROMPT_TEMPLATE_PATH}. "
-        "The application cannot start without it."
+    # Required environment variables
+    llm_model: str
+    ezbookkeeping_url: str
+    llm_provider: str
+    timezone_str: str = Field(alias="TIMEZONE")
+
+    # Optional environment variables
+    telegram_bot_token: str = ""
+    allowed_users_raw: str = Field(default="", alias="ALLOWED_USERS")
+    log_level: str = "INFO"
+
+    # API Key per provider
+    groq_api_key: str = ""
+    openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    google_api_key: str = ""
+
+    # Providers supported
+    supported_providers: set[str] = {"groq", "openai", "anthropic", "gemini"}
+
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
-    raise
+
+    # --- Properties calculated and validations ---
+    @property
+    def allowed_users(self) -> set[int]:
+        if not self.allowed_users_raw.strip():
+            return set()
+        return {int(uid) for uid in self.allowed_users_raw.split(",") if uid.strip()}
+
+    @property
+    def timezone(self) -> ZoneInfo:
+        return ZoneInfo(self.timezone_str)
+
+    @property
+    def llm_api_key(self) -> str:
+        provider_map = {
+            "groq": self.groq_api_key,
+            "openai": self.openai_api_key,
+            "anthropic": self.anthropic_api_key,
+            "gemini": self.google_api_key,
+        }
+        key = provider_map.get(self.llm_provider, "")
+        if not key:
+            raise ValueError(f"Missing API key for LLM provider '{self.llm_provider}'")
+        return key
+
+    @field_validator("llm_provider")
+    @classmethod
+    def validate_provider(cls, v: str) -> str:
+        valid = {"groq", "openai", "anthropic", "gemini"}
+        if v not in valid:
+            raise ValueError(
+                f"LLM_PROVIDER '{v}' not supported. Must be one of: {valid}"
+            )
+        return v
+
+    @property
+    def system_prompt_template(self) -> str:
+        if not self.prompt_template_path.exists():
+            raise FileNotFoundError(
+                f"System prompt template not found at {self.prompt_template_path}"
+            )
+        return self.prompt_template_path.read_text(encoding="utf-8")
+
+
+# --- Settings' global instance ---
+settings = Settings()
+
+
+# --- Logging's configuration ---
+def setup_logger() -> logging.Logger:
+    log_numeric = getattr(logging, settings.log_level.upper(), logging.INFO)
+
+    file_handler = RotatingFileHandler(
+        settings.log_file, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
+    )
+    file_handler.setFormatter(
+        logging.Formatter(
+            "[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(
+        colorlog.ColoredFormatter(
+            fmt="%(log_color)s[%(asctime)s] [%(levelname)s]%(reset)s %(purple)s[%(filename)s:%(lineno)d]%(reset)s %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+            log_colors={
+                "DEBUG": "cyan",
+                "INFO": "green",
+                "WARNING": "yellow",
+                "ERROR": "red",
+                "CRITICAL": "red,bg_white",
+            },
+        )
+    )
+
+    logging.basicConfig(level=log_numeric, handlers=[file_handler, stream_handler])
+    return logging.getLogger("bot_finanzas")
+
+
+logger = setup_logger()
