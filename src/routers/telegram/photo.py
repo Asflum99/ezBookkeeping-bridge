@@ -1,13 +1,10 @@
 from typing import cast
 
-from fastapi import HTTPException
-
-from config import ALLOWED_USERS, TELEGRAM_BOT_TOKEN, logger
+from config import TELEGRAM_BOT_TOKEN, logger
 from formatter import (
     prepare_confirmation_message,
     validate_and_sanitize_voucher_data,
 )
-from repositories.user_repository import UserRepository
 from routers.telegram.utils import send_telegram_message
 from schemas import TelegramMessage, TelegramPhotoSize, TelegramUpdate
 from services.ezbookkeeping_service import register_transaction
@@ -17,17 +14,12 @@ from services.telegram_file_service import delete_local_file, download_telegram_
 
 async def handle_photo(
     payload: TelegramUpdate,
-    user_repo: UserRepository,
+    user_info: dict,
+    chat_id: int,
 ) -> dict:
     """Process a photo message (voucher)."""
     token = TELEGRAM_BOT_TOKEN
     payload_message = cast(TelegramMessage, payload.message)
-    chat_id = payload_message.chat.id
-    user_id = payload_message.from_user.id
-
-    if user_id not in ALLOWED_USERS:
-        logger.warning(f"🚫 Access denied attempt for Telegram ID: {user_id}")
-        raise HTTPException(status_code=403, detail="Unauthorized access")
 
     payload_message_photo = cast(list[TelegramPhotoSize], payload_message.photo)
     optimal_photo = payload_message_photo[-1]
@@ -36,15 +28,6 @@ async def handle_photo(
         f"Optimal photo detected for processing: {file_id} "
         f"({optimal_photo.width}x{optimal_photo.height}px)"
     )
-
-    user_info = user_repo.get_user(user_id)
-    if not user_info:
-        send_telegram_message(
-            token,
-            chat_id,
-            "⛔ No estás registrado en el sistema del bot financiero. Pídele al administrador que te agregue.",
-        )
-        return {"status": "success", "detail": "Unregistered user"}
 
     local_photo_path = None
     try:
