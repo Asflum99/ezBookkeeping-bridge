@@ -61,8 +61,10 @@ class UserRepository:
 
     def sync_accounts(self, telegram_id: int, remote_accounts: list[dict]) -> dict:
         """Sync local user_accounts with remote ezBookkeeping accounts."""
+        logger.info(f"Syncing accounts for user {telegram_id}")
         remote_map = {acc["id"]: acc["name"] for acc in remote_accounts}
         remote_ids = set(remote_map.keys())
+        logger.debug(f"Remote ids: {remote_ids}")
 
         with get_db(self._db_path) as conn:
             local_rows = conn.execute(
@@ -71,11 +73,14 @@ class UserRepository:
             ).fetchall()
 
             local_ids = {row["ez_account_id"] for row in local_rows}
+            logger.debug(f"Local ids: {local_ids}")
             local_names = {row["ez_account_id"]: row["name"] for row in local_rows}
+            logger.debug(f"Local names: {local_names}")
 
             # Remove accounts no longer in remote
             to_remove = local_ids - remote_ids
             for ez_id in to_remove:
+                logger.debug(f"Removing account {ez_id} for user {telegram_id}")
                 conn.execute(
                     "DELETE FROM user_accounts WHERE user_id = ? AND ez_account_id = ?",
                     (telegram_id, ez_id),
@@ -86,6 +91,7 @@ class UserRepository:
             added = []
             for ez_id in to_add:
                 name = remote_map[ez_id]
+                logger.debug(f"Adding account {name} ({ez_id}) for user {telegram_id}")
                 conn.execute(
                     "INSERT INTO user_accounts (user_id, name, ez_account_id, hints) VALUES (?, ?, ?, ?)",
                     (telegram_id, name, ez_id, ""),
@@ -94,4 +100,7 @@ class UserRepository:
 
             removed = [local_names[eid] for eid in to_remove]
 
+        logger.info(
+            f"Account sync complete for user {telegram_id}: +{len(added)} -{len(removed)}"
+        )
         return {"added": added, "removed": removed}

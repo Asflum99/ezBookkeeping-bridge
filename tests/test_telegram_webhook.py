@@ -133,6 +133,7 @@ class TestTelegramWebhook:
         user_repo.sync_accounts.return_value = {
             "added": [{"id": "acc-1", "name": "BCP"}],
             "removed": [],
+            "updated": [],
         }
         client = _build_client(user_repo)
 

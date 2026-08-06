@@ -18,8 +18,11 @@ async def handle_update_accounts(
     message = cast(TelegramMessage, payload.message)
     user_id = message.from_user.id
 
+    logger.info(f"Processing accounts update for user {user_id}")
+
     remote_accounts = await get_user_accounts(user_info["ez_token"])
     if remote_accounts is None:
+        logger.error(f"Failed to fetch remote accounts for user {user_id}")
         send_telegram_message(
             token,
             chat_id,
@@ -29,12 +32,20 @@ async def handle_update_accounts(
 
     result = user_repo.sync_accounts(user_id, remote_accounts)
 
-    added = len(result["added"])
-    removed = len(result["removed"])
-    send_telegram_message(
-        token,
-        chat_id,
-        f"Cuentas actualizadas: +{added} -{removed}",
-    )
+    added = result["added"]
+    removed = result["removed"]
+    updated = result["updated"]
+    logger.info(f"Accounts synced for user {user_id}: +{len(added)} -{len(removed)} ~{len(updated)}")
+
+    lines = [f"Cuentas actualizadas: +{len(added)} -{len(removed)} ~{len(updated)}"]
+    if added:
+        lines.append(f"Añadidas: {', '.join(acc['name'] for acc in added)}")
+    if removed:
+        lines.append(f"Eliminadas: {', '.join(removed)}")
+    if updated:
+        renamed = [f"{u['old_name']} → {u['new_name']}" for u in updated]
+        lines.append(f"Renombradas: {', '.join(renamed)}")
+
+    send_telegram_message(token, chat_id, "\n".join(lines))
 
     return {"status": "success", "detail": "Accounts synced"}
