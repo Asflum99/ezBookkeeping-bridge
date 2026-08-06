@@ -7,13 +7,6 @@ import respx
 from services.ezbookkeeping_service import get_user_accounts, register_transaction
 
 
-@pytest.fixture(autouse=True)
-def mock_ezbookkeeping_url(monkeypatch):
-    monkeypatch.setattr(
-        "services.ezbookkeeping_service.EZBOOKKEEPING_URL", "http://test"
-    )
-
-
 class TestRegisterTransaction:
     VALID_SANITIZED_DATA: ClassVar = {
         "amount": 25.50,
