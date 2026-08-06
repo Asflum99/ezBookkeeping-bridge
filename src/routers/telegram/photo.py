@@ -1,6 +1,6 @@
 from typing import cast
 
-from config import TELEGRAM_BOT_TOKEN, logger
+from config import logger, settings
 from formatter import (
     prepare_confirmation_message,
     validate_and_sanitize_voucher_data,
@@ -18,7 +18,7 @@ async def handle_photo(
     chat_id: int,
 ) -> dict:
     """Process a photo message (voucher)."""
-    token = TELEGRAM_BOT_TOKEN
+    token = settings.telegram_bot_token
     payload_message = cast(TelegramMessage, payload.message)
 
     payload_message_photo = cast(list[TelegramPhotoSize], payload_message.photo)

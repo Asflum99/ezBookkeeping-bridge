@@ -4,6 +4,7 @@ import builtins
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from config import settings
 from services.llm_service import (
     _build_messages,
     _encode_image,
@@ -72,9 +73,9 @@ class TestGetLlm:
         _get_llm.cache_clear()
 
     def test_groq_provider(self, monkeypatch, mocker):
-        monkeypatch.setattr("services.llm_service.LLM_PROVIDER", "groq")
-        monkeypatch.setattr("services.llm_service.LLM_MODEL", "test-model")
-        monkeypatch.setattr("services.llm_service.LLM_API_KEY", "test-key")
+        monkeypatch.setattr(settings, "llm_provider", "groq")
+        monkeypatch.setattr(settings, "llm_model", "test-model")
+        monkeypatch.setattr(settings, "groq_api_key", "test-key")
 
         mock_groq = mocker.patch("langchain_groq.ChatGroq")
         mock_groq.return_value = mocker.MagicMock()
@@ -86,9 +87,9 @@ class TestGetLlm:
         )
 
     def test_openai_provider(self, monkeypatch, mocker):
-        monkeypatch.setattr("services.llm_service.LLM_PROVIDER", "openai")
-        monkeypatch.setattr("services.llm_service.LLM_MODEL", "test-model")
-        monkeypatch.setattr("services.llm_service.LLM_API_KEY", "test-key")
+        monkeypatch.setattr(settings, "llm_provider", "openai")
+        monkeypatch.setattr(settings, "llm_model", "test-model")
+        monkeypatch.setattr(settings, "openai_api_key", "test-key")
 
         mock_openai = mocker.patch("langchain_openai.ChatOpenAI")
         mock_openai.return_value = mocker.MagicMock()
@@ -100,9 +101,9 @@ class TestGetLlm:
         )
 
     def test_anthropic_provider(self, monkeypatch, mocker):
-        monkeypatch.setattr("services.llm_service.LLM_PROVIDER", "anthropic")
-        monkeypatch.setattr("services.llm_service.LLM_MODEL", "test-model")
-        monkeypatch.setattr("services.llm_service.LLM_API_KEY", "test-key")
+        monkeypatch.setattr(settings, "llm_provider", "anthropic")
+        monkeypatch.setattr(settings, "llm_model", "test-model")
+        monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
 
         mock_anthropic = mocker.patch("langchain_anthropic.ChatAnthropic")
         mock_anthropic.return_value = mocker.MagicMock()
@@ -114,9 +115,9 @@ class TestGetLlm:
         )
 
     def test_gemini_provider(self, monkeypatch, mocker):
-        monkeypatch.setattr("services.llm_service.LLM_PROVIDER", "gemini")
-        monkeypatch.setattr("services.llm_service.LLM_MODEL", "test-model")
-        monkeypatch.setattr("services.llm_service.LLM_API_KEY", "test-key")
+        monkeypatch.setattr(settings, "llm_provider", "gemini")
+        monkeypatch.setattr(settings, "llm_model", "test-model")
+        monkeypatch.setattr(settings, "google_api_key", "test-key")
 
         mock_gemini = mocker.patch("langchain_google_genai.ChatGoogleGenerativeAI")
         mock_gemini.return_value = mocker.MagicMock()
@@ -128,15 +129,15 @@ class TestGetLlm:
         )
 
     def test_unsupported_provider(self, monkeypatch):
-        monkeypatch.setattr("services.llm_service.LLM_PROVIDER", "unsupported")
+        monkeypatch.setattr(settings, "llm_provider", "unsupported")
 
         with pytest.raises(ValueError, match="Unsupported LLM provider"):
             _get_llm()
 
     def test_missing_provider_module_raises_runtime_error(self, monkeypatch):
-        monkeypatch.setattr("services.llm_service.LLM_PROVIDER", "groq")
-        monkeypatch.setattr("services.llm_service.LLM_MODEL", "test-model")
-        monkeypatch.setattr("services.llm_service.LLM_API_KEY", "test-key")
+        monkeypatch.setattr(settings, "llm_provider", "groq")
+        monkeypatch.setattr(settings, "llm_model", "test-model")
+        monkeypatch.setattr(settings, "groq_api_key", "test-key")
 
         # Patch __import__ to raise ModuleNotFoundError for langchain_groq
         original_import = builtins.__import__

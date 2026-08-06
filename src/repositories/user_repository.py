@@ -1,14 +1,14 @@
 from pathlib import Path
 from typing import Any
 
-from config import DATABASE_PATH, logger
+from config import logger, settings
 from database import get_db
 
 
 class UserRepository:
     """User configuration repository backed by SQLite."""
 
-    def __init__(self, db_path: Path = DATABASE_PATH):
+    def __init__(self, db_path: Path = settings.database_path):
         self._db_path = db_path
 
     def get_user(self, telegram_id: int) -> dict[str, Any] | None:

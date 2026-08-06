@@ -1,16 +1,15 @@
-import os
 import sys
 
 from fastapi import FastAPI
 
-from config import logger
-from routers.telegram import router as telegram_router
+from config import logger, settings
+from routers.telegram.webhook import router as telegram_router
 
 # ==========================================
 # Global configuration
 # ==========================================
 
-if not os.getenv("TELEGRAM_BOT_TOKEN") or not os.getenv("ALLOWED_USERS"):
+if not settings.telegram_bot_token or not settings.allowed_users_raw:
     logger.critical("❌ Missing BOT_TOKEN or ALLOWED_USERS environment variables")
     sys.exit(1)
 

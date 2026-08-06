@@ -9,13 +9,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.runnables import RunnableLambda
 
-from config import (
-    LLM_API_KEY,
-    LLM_MODEL,
-    LLM_PROVIDER,
-    SYSTEM_PROMPT_TEMPLATE,
-    logger,
-)
+from config import logger, settings
 
 
 def build_system_prompt(
@@ -27,7 +21,7 @@ def build_system_prompt(
         f'- "{name}": Matches {hints}' for name, hints in user_accounts
     )
     logger.debug(f"Rendered accounts in prompt:\n{formatted_accounts}")
-    return SYSTEM_PROMPT_TEMPLATE.format(
+    return settings.system_prompt_template.format(
         categories_list=formatted_categories, accounts_list=formatted_accounts
     )
 
@@ -36,34 +30,34 @@ def build_system_prompt(
 def _get_llm() -> BaseChatModel:
     """Factory: lazy-import provider package and return configured LLM."""
     try:
-        if LLM_PROVIDER == "groq":
+        if settings.llm_provider == "groq":
             from langchain_groq import ChatGroq  # ty: ignore[unresolved-import]
 
-            return ChatGroq(model=LLM_MODEL, temperature=0.0, api_key=LLM_API_KEY)
-        elif LLM_PROVIDER == "openai":
+            return ChatGroq(model=settings.llm_model, temperature=0.0, api_key=settings.llm_api_key)
+        elif settings.llm_provider == "openai":
             from langchain_openai import ChatOpenAI  # ty: ignore[unresolved-import]
 
-            return ChatOpenAI(model=LLM_MODEL, temperature=0.0, api_key=LLM_API_KEY)
-        elif LLM_PROVIDER == "anthropic":
+            return ChatOpenAI(model=settings.llm_model, temperature=0.0, api_key=settings.llm_api_key)
+        elif settings.llm_provider == "anthropic":
             from langchain_anthropic import (  # ty: ignore[unresolved-import]
                 ChatAnthropic,
             )
 
-            return ChatAnthropic(model=LLM_MODEL, temperature=0.0, api_key=LLM_API_KEY)
-        elif LLM_PROVIDER == "gemini":
+            return ChatAnthropic(model=settings.llm_model, temperature=0.0, api_key=settings.llm_api_key)
+        elif settings.llm_provider == "gemini":
             from langchain_google_genai import (  # ty: ignore[unresolved-import]
                 ChatGoogleGenerativeAI,
             )
 
             return ChatGoogleGenerativeAI(
-                model=LLM_MODEL, temperature=0.0, google_api_key=LLM_API_KEY
+                model=settings.llm_model, temperature=0.0, google_api_key=settings.llm_api_key
             )
         else:
-            raise ValueError(f"Unsupported LLM provider: {LLM_PROVIDER}")
+            raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
     except ModuleNotFoundError:
         raise RuntimeError(
-            f"Missing dependency for LLM provider '{LLM_PROVIDER}'. "
-            f'Install it with: uv pip install -e ".[{LLM_PROVIDER}]"'
+            f"Missing dependency for LLM provider '{settings.llm_provider}'. "
+            f'Install it with: uv pip install -e ".[{settings.llm_provider}]"'
         )
 
 
