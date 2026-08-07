@@ -124,6 +124,18 @@ def setup_logger() -> logging.Logger:
     )
 
     logging.basicConfig(level=log_numeric, handlers=[file_handler, stream_handler])
+
+    # Silence external libraries to avoid tokens leak
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+    # Silence external libraries to avoid tokens leak
+    logging.getLogger("groq").setLevel(logging.WARNING)
+    logging.getLogger("openai").setLevel(logging.WARNING)
+    logging.getLogger("anthropic").setLevel(logging.WARNING)
+    logging.getLogger("gemini").setLevel(logging.WARNING)
+
     return logging.getLogger("bot_finanzas")
 
 
