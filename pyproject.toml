@@ -1,7 +1,7 @@
 [project]
 name = "ezBookkeeping-bridge"
 version = "0.2.0"
-description = "Lightweight backend built with **FastAPI** for recording expenses sent as voucher photos from a private Telegram bot. Uses AI to extract structured data and registers transactions in ezBookkeeping."
+description = "Backend built with **FastAPI** for recording expenses sent as voucher photos. Uses AI to extract structured data and registers transactions in ezBookkeeping."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

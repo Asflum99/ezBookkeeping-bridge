@@ -42,7 +42,7 @@ Telegram finance bot. **FastAPI** (Python 3.12). Receives voucher photos via Tel
 - **Entrypoint**: `src/main.py` (FastAPI app)
 - **Webhook**: `POST /webhook/telegram`
 - **Routers**: `src/routers/telegram/` (photo processing, webhook dispatch)
-- **Services**: `src/services/` (Groq AI, ezBookkeeping, Telegram file)
+- **Services**: `src/services/` (LLM via LangChain `init_chat_model`, ezBookkeeping, Telegram file)
 - **Repositories**: `src/repositories/` (UserRepository - SQLite)
 - **DI**: `src/routers/telegram/webhook.py` (get_user_repository)
 - **Schemas**: `src/schemas.py` (Pydantic models for Telegram updates)

@@ -1,6 +1,7 @@
 # ezBookkeeping-bridge
 
-Lightweight backend built with **FastAPI** for recording expenses sent as voucher photos from a private Telegram bot. Uses AI to extract structured data and registers transactions in ezBookkeeping.
+Backend built with **FastAPI** for recording expenses sent as voucher photos from a private Telegram bot. Uses AI to extract structured data and registers transactions in ezBookkeeping.
+It currently works only on Telegram bots.
 
 ## Features
 
@@ -27,7 +28,7 @@ src/
 ├── repositories/
 │   └── user_repository.py           # SQLite CRUD
 ├── services/
-│   ├── llm_service.py               # LLM integration (Groq/OpenAI/etc)
+│   ├── llm_service.py               # Multi-provider LLM integration (Groq, OpenAI, Anthropic, Gemini via init_chat_model)
 │   ├── ezbookkeeping_service.py     # ezBookkeeping API
 │   └── telegram_file_service.py     # Photo download/cleanup
 └── templates/
