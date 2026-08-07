@@ -4,7 +4,7 @@ import re
 from functools import lru_cache
 from typing import Any
 
-from langchain_core.language_models import BaseChatModel
+from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.runnables import RunnableLambda
@@ -26,34 +26,27 @@ def build_system_prompt(
     )
 
 
+_PROVIDER_MAP = {
+    "groq": "groq",
+    "openai": "openai",
+    "anthropic": "anthropic",
+    "gemini": "google_genai",
+}
+
+
 @lru_cache(1)
-def _get_llm() -> BaseChatModel:
-    """Factory: lazy-import provider package and return configured LLM."""
+def _get_llm():
+    """Factory: return configured LLM via init_chat_model."""
+    provider = _PROVIDER_MAP.get(settings.llm_provider)
+    if not provider:
+        raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
     try:
-        if settings.llm_provider == "groq":
-            from langchain_groq import ChatGroq  # ty: ignore[unresolved-import]
-
-            return ChatGroq(model=settings.llm_model, temperature=0.0, api_key=settings.llm_api_key)
-        elif settings.llm_provider == "openai":
-            from langchain_openai import ChatOpenAI  # ty: ignore[unresolved-import]
-
-            return ChatOpenAI(model=settings.llm_model, temperature=0.0, api_key=settings.llm_api_key)
-        elif settings.llm_provider == "anthropic":
-            from langchain_anthropic import (  # ty: ignore[unresolved-import]
-                ChatAnthropic,
-            )
-
-            return ChatAnthropic(model=settings.llm_model, temperature=0.0, api_key=settings.llm_api_key)
-        elif settings.llm_provider == "gemini":
-            from langchain_google_genai import (  # ty: ignore[unresolved-import]
-                ChatGoogleGenerativeAI,
-            )
-
-            return ChatGoogleGenerativeAI(
-                model=settings.llm_model, temperature=0.0, google_api_key=settings.llm_api_key
-            )
-        else:
-            raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
+        return init_chat_model(
+            settings.llm_model,
+            model_provider=provider,
+            temperature=0.0,
+            api_key=settings.llm_api_key,
+        )
     except ModuleNotFoundError:
         raise RuntimeError(
             f"Missing dependency for LLM provider '{settings.llm_provider}'. "

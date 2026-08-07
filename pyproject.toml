@@ -8,6 +8,7 @@ dependencies = [
   "colorlog>=6.10.1",
   "fastapi>=0.138.1",
   "httpx>=0.28.1",
+  "langchain>=0.3",
   "langchain-core>=1.4.8",
   "pydantic>=2.13.4",
   "pydantic-settings>=2.0",

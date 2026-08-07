@@ -1,5 +1,4 @@
 import base64
-import builtins
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -53,23 +52,8 @@ class TestBuildSystemPrompt:
 
 class TestGetLlm:
     @pytest.fixture(autouse=True)
-    def _mock_provider_modules(self, mocker):
-        """Ensure provider imports resolve to mocks even without real packages."""
-        modules_to_mock = [
-            "langchain_groq",
-            "langchain_openai",
-            "langchain_anthropic",
-            "langchain_google_genai",
-        ]
-
-        mock_sys_modules = {
-            mod_name: mocker.MagicMock() for mod_name in modules_to_mock
-        }
-
-        mocker.patch.dict("sys.modules", mock_sys_modules)
-
+    def _clear_cache(self):
         yield
-
         _get_llm.cache_clear()
 
     def test_groq_provider(self, monkeypatch, mocker):
@@ -77,13 +61,13 @@ class TestGetLlm:
         monkeypatch.setattr(settings, "llm_model", "test-model")
         monkeypatch.setattr(settings, "groq_api_key", "test-key")
 
-        mock_groq = mocker.patch("langchain_groq.ChatGroq")
-        mock_groq.return_value = mocker.MagicMock()
+        mock_init = mocker.patch("services.llm_service.init_chat_model")
+        mock_init.return_value = mocker.MagicMock()
 
         _get_llm()
 
-        mock_groq.assert_called_once_with(
-            model="test-model", temperature=0.0, api_key="test-key"
+        mock_init.assert_called_once_with(
+            "test-model", model_provider="groq", temperature=0.0, api_key="test-key"
         )
 
     def test_openai_provider(self, monkeypatch, mocker):
@@ -91,13 +75,13 @@ class TestGetLlm:
         monkeypatch.setattr(settings, "llm_model", "test-model")
         monkeypatch.setattr(settings, "openai_api_key", "test-key")
 
-        mock_openai = mocker.patch("langchain_openai.ChatOpenAI")
-        mock_openai.return_value = mocker.MagicMock()
+        mock_init = mocker.patch("services.llm_service.init_chat_model")
+        mock_init.return_value = mocker.MagicMock()
 
         _get_llm()
 
-        mock_openai.assert_called_once_with(
-            model="test-model", temperature=0.0, api_key="test-key"
+        mock_init.assert_called_once_with(
+            "test-model", model_provider="openai", temperature=0.0, api_key="test-key"
         )
 
     def test_anthropic_provider(self, monkeypatch, mocker):
@@ -105,27 +89,33 @@ class TestGetLlm:
         monkeypatch.setattr(settings, "llm_model", "test-model")
         monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
 
-        mock_anthropic = mocker.patch("langchain_anthropic.ChatAnthropic")
-        mock_anthropic.return_value = mocker.MagicMock()
+        mock_init = mocker.patch("services.llm_service.init_chat_model")
+        mock_init.return_value = mocker.MagicMock()
 
         _get_llm()
 
-        mock_anthropic.assert_called_once_with(
-            model="test-model", temperature=0.0, api_key="test-key"
+        mock_init.assert_called_once_with(
+            "test-model",
+            model_provider="anthropic",
+            temperature=0.0,
+            api_key="test-key",
         )
 
-    def test_gemini_provider(self, monkeypatch, mocker):
+    def test_gemini_uses_google_genai_provider(self, monkeypatch, mocker):
         monkeypatch.setattr(settings, "llm_provider", "gemini")
         monkeypatch.setattr(settings, "llm_model", "test-model")
         monkeypatch.setattr(settings, "google_api_key", "test-key")
 
-        mock_gemini = mocker.patch("langchain_google_genai.ChatGoogleGenerativeAI")
-        mock_gemini.return_value = mocker.MagicMock()
+        mock_init = mocker.patch("services.llm_service.init_chat_model")
+        mock_init.return_value = mocker.MagicMock()
 
         _get_llm()
 
-        mock_gemini.assert_called_once_with(
-            model="test-model", temperature=0.0, google_api_key="test-key"
+        mock_init.assert_called_once_with(
+            "test-model",
+            model_provider="google_genai",
+            temperature=0.0,
+            api_key="test-key",
         )
 
     def test_unsupported_provider(self, monkeypatch):
@@ -134,20 +124,15 @@ class TestGetLlm:
         with pytest.raises(ValueError, match="Unsupported LLM provider"):
             _get_llm()
 
-    def test_missing_provider_module_raises_runtime_error(self, monkeypatch):
+    def test_missing_provider_module_raises_runtime_error(self, monkeypatch, mocker):
         monkeypatch.setattr(settings, "llm_provider", "groq")
         monkeypatch.setattr(settings, "llm_model", "test-model")
         monkeypatch.setattr(settings, "groq_api_key", "test-key")
 
-        # Patch __import__ to raise ModuleNotFoundError for langchain_groq
-        original_import = builtins.__import__
-
-        def mock_import(name, *args, **kwargs):
-            if name == "langchain_groq":
-                raise ModuleNotFoundError("No module named 'langchain_groq'")
-            return original_import(name, *args, **kwargs)
-
-        monkeypatch.setattr("builtins.__import__", mock_import)
+        mocker.patch(
+            "services.llm_service.init_chat_model",
+            side_effect=ModuleNotFoundError("No module named 'langchain_groq'"),
+        )
 
         with pytest.raises(RuntimeError, match="Missing dependency"):
             _get_llm()
@@ -155,7 +140,7 @@ class TestGetLlm:
 
 class TestStripThinking:
     def test_removes_think_block(self):
-        text = "{\"amount\": 3}"
+        text = '{"amount": 3}'
         result = _strip_thinking(text)
         assert result == '{"amount": 3}'
 
@@ -169,7 +154,7 @@ class TestStripThinking:
         assert result == '{"amount": 3}'
 
     def test_handles_aimessage_with_think_block(self):
-        msg = AIMessage(content="<think>reasoning</think>\n{\"amount\": 3}")
+        msg = AIMessage(content='<think>reasoning</think>\n{"amount": 3}')
         result = _strip_thinking(msg)
         assert result == '{"amount": 3}'
 
