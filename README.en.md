@@ -1,12 +1,14 @@
+[English](README.en.md) | [Español](README.md)
+
 # ezBookkeeping-bridge
 
-Backend built with **FastAPI** for recording expenses sent as voucher photos from a private Telegram bot. Uses AI to extract structured data and registers transactions in ezBookkeeping.
-It currently works only on Telegram bots.
+Backend built with **FastAPI** for recording expenses sent as voucher photos. Uses AI to extract structured data and registers transactions in ezBookkeeping.
+Currently only works with Telegram bots.
 
 ## Features
 
 - **Access control**: Filtered by authorized Telegram IDs.
-- **AI extraction**: Sends voucher photos to LLM, returns category, amount, date, and payment method as JSON.
+- **AI extraction**: Sends voucher photos to LLM, gets category, amount, date, and payment method as JSON.
 - **Automatic registration**: Creates transactions in ezBookkeeping via REST API.
 - **User confirmation**: Replies on Telegram with the recorded data.
 
@@ -18,7 +20,7 @@ src/
 ├── config.py                        # Logging, paths, env vars
 ├── schemas.py                       # Pydantic models for Telegram webhook
 ├── database.py                      # SQLite connection + schema
-├── formatter.py                     # Date validation, confirmation messages
+├── formatter.py                     # Date validation, messages
 ├── routers/
 │   └── telegram/
 │       ├── __init__.py              # Router re-export
@@ -28,7 +30,7 @@ src/
 ├── repositories/
 │   └── user_repository.py           # SQLite CRUD
 ├── services/
-│   ├── llm_service.py               # Multi-provider LLM integration (Groq, OpenAI, Anthropic, Gemini via init_chat_model)
+│   ├── llm_service.py               # Multi-provider LLM integration
 │   ├── ezbookkeeping_service.py     # ezBookkeeping API
 │   └── telegram_file_service.py     # Photo download/cleanup
 └── templates/
@@ -37,25 +39,16 @@ src/
 
 ## Requirements
 
-- **mise** — Python version management and task runner.
-- **uv** — Dependency management.
-- **cloudflared** — HTTPS tunnel for local development.
+- [**mise**](https://github.com/jdx/mise) — Python version management and task runner.
+- [**uv**](https://github.com/astral-sh/uv) — Dependency management.
+- [**cloudflared**](https://github.com/cloudflare/cloudflared) — HTTPS tunnel for local development.
 
 ## Setup
 
-Create `mise.local.toml` in the project root (git-ignored):
+Copy `mise.local.toml.example` and modify it with your own credentials:
 
-```toml
-[env]
-TELEGRAM_BOT_TOKEN = "your_botfather_token"
-ALLOWED_USERS = "123456789,987654321"    # Authorized Telegram IDs
-LLM_PROVIDER = "groq"                    # groq | openai | anthropic | gemini
-LLM_MODEL = "..."
-GROQ_API_KEY = "gsk_..."                 # if LLM_PROVIDER = "groq"
-OPENAI_API_KEY = "sk-..."                # if LLM_PROVIDER = "openai"
-ANTHROPIC_API_KEY = "sk-ant-..."         # if LLM_PROVIDER = "anthropic"
-GOOGLE_API_KEY = "AIza..."               # if LLM_PROVIDER = "gemini"
-EZBOOKKEEPING_URL = "https://..."
+```bash
+cp mise.local.toml.example mise.local.toml
 ```
 
 Then install dependencies:
@@ -73,6 +66,8 @@ uv pip install -e ".[anthropic]" # for Anthropic
 uv pip install -e ".[gemini]"    # for Google Gemini
 uv pip install -e ".[all]"       # all providers
 ```
+
+Currently, the project only works with Telegram bots. For a guide on how to create one, click [here.](src/routers/telegram/README.en.md)
 
 ## Local Development
 
@@ -98,22 +93,39 @@ Copy the generated public URL (ends in `.trycloudflare.com`).
 mise run set-webhook https://YOUR_URL.trycloudflare.com
 ```
 
-Or manually:
-
-```bash
-curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
-     -H "Content-Type: application/json" \
-     -d '{"url": "https://YOUR_URL.trycloudflare.com/webhook/telegram/"}'
-```
-
 ### 4. Verify
 
 ```bash
 mise run verify-webhook
 ```
 
-or manually:
+## Production Deployment
+
+### 1. Prerequisites
+
+1. Telegram bot
+2. ezBookkeeping
+
+On the server hosting ezBookkeeping, clone this repository:
 
 ```bash
-curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
+git clone https://github.com/Asflum99/ezBookkeeping-bridge
+```
+
+### 2. Start the server
+
+```bash
+mise run prod
+```
+
+### 3. Set the webhook
+
+```bash
+mise run set-webhook https://YOUR_URL
+```
+
+### 4. Verify
+
+```bash
+mise run verify-webhook
 ```

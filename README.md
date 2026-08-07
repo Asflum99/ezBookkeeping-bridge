@@ -1,3 +1,5 @@
+[English](README.en.md) | [Español](README.md)
+
 # ezBookkeeping-bridge
 
 Backend desarrollado con **FastAPI** para registrar gastos enviados como fotos de vouchers. Usa IA para extraer datos estructurados y los registra en ezBookkeeping.
@@ -28,7 +30,7 @@ src/
 ├── repositories/
 │   └── user_repository.py           # CRUD SQLite
 ├── services/
-│   ├── llm_service.py               # Integración multi-proveedor LLM (Groq, OpenAI, Anthropic, Gemini via init_chat_model)
+│   ├── llm_service.py               # Integración multi-proveedor LLM
 │   ├── ezbookkeeping_service.py     # API ezBookkeeping
 │   └── telegram_file_service.py     # Descarga/eliminación de fotos
 └── templates/
@@ -37,25 +39,16 @@ src/
 
 ## Requisitos
 
-- **mise** — gestión de versiones de Python y tareas.
-- **uv** — gestión de dependencias.
-- **cloudflared** — túnel HTTPS para desarrollo local.
+- [**mise**](https://github.com/jdx/mise) — gestión de versiones de Python y tareas.
+- [**uv**](https://github.com/astral-sh/uv) — gestión de dependencias.
+- [**cloudflared**](https://github.com/cloudflare/cloudflared) — túnel HTTPS para desarrollo local.
 
 ## Configuración
 
-Crea `mise.local.toml` en la raíz del proyecto (git-ignored):
+Copia `mise.local.toml.example` y luego modificalo con tus propias credenciales:
 
-```toml
-[env]
-TELEGRAM_BOT_TOKEN = "tu_token_de_botfather"
-ALLOWED_USERS = "123456789,987654321"    # IDs de Telegram autorizados
-LLM_PROVIDER = "groq"                    # groq | openai | anthropic | gemini
-LLM_MODEL = "..."
-GROQ_API_KEY = "gsk_..."                 # si LLM_PROVIDER = "groq"
-OPENAI_API_KEY = "sk-..."                # si LLM_PROVIDER = "openai"
-ANTHROPIC_API_KEY = "sk-ant-..."         # si LLM_PROVIDER = "anthropic"
-GOOGLE_API_KEY = "AIza..."               # si LLM_PROVIDER = "gemini"
-EZBOOKKEEPING_URL = "https://..."
+```bash
+cp mise.local.toml.example mise.local.toml
 ```
 
 Luego instala dependencias:
@@ -73,6 +66,8 @@ uv pip install -e ".[anthropic]" # para Anthropic
 uv pip install -e ".[gemini]"    # para Google Gemini
 uv pip install -e ".[all]"       # todos los proveedores
 ```
+
+Hasta el momento, el proyecto solo funciona con bots de Telegram. Para una guía sobre cómo crear uno, haz clic [aquí.](src/routers/telegram/README.md)
 
 ## Desarrollo Local
 
@@ -98,22 +93,39 @@ Copia la URL pública generada (termina en `.trycloudflare.com`).
 mise run set-webhook https://TU_URL.trycloudflare.com
 ```
 
-O manualmente:
-
-```bash
-curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
-     -H "Content-Type: application/json" \
-     -d '{"url": "https://TU_URL.trycloudflare.com/webhook/telegram/"}'
-```
-
 ### 4. Verificar
 
 ```bash
 mise run verify-webhook
 ```
 
-o manualmente:
+## Desplegar en producción
+
+### 1. Prerrequisitos
+
+1. Bot de Telegram
+2. ezBookkeeping
+
+En el servidor donde se aloja ezBookkeeping deberás clonar este repositorio
 
 ```bash
-curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
+git clone https://github.com/Asflum99/ezBookkeeping-bridge
+```
+
+### 2. Levantar el servidor
+
+```bash
+mise run prod
+```
+
+### 3. Vincular el webhook
+
+```bash
+mise run set-webhook https://TU_URL
+```
+
+### 4. Verificar
+
+```bash
+mise run verify-webhook
 ```

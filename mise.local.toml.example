@@ -1,0 +1,15 @@
+[env]
+TELEGRAM_BOT_TOKEN = "botfather_token"
+ALLOWED_USERS = "telegram_id"
+EZBOOKKEEPING_URL = "https://..."
+
+# Pick one of these 4 providers: GROQ, OPENAI, ANTHROPIC, GEMINI
+LLM_PROVIDER = "..."
+
+LLM_MODEL = "..."
+
+# Once the provider is chosen, edit its API key and delete the others
+GROQ_API_KEY = "gsk_..."                 # si LLM_PROVIDER = "groq"
+OPENAI_API_KEY = "sk-..."                # si LLM_PROVIDER = "openai"
+ANTHROPIC_API_KEY = "sk-ant-..."         # si LLM_PROVIDER = "anthropic"
+GOOGLE_API_KEY = "AIza..."               # si LLM_PROVIDER = "gemini"
