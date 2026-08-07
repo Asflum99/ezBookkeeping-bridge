@@ -109,5 +109,11 @@ curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
 ### 4. Verificar
 
 ```bash
+mise run verify-webhook
+```
+
+o manualmente:
+
+```bash
 curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
 ```
