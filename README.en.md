@@ -1,4 +1,4 @@
-[English](README.en.md) | [Español](README.md)
+English | [Español](README.md)
 
 # ezBookkeeping-bridge
 
@@ -103,8 +103,8 @@ mise run verify-webhook
 
 ### 1. Prerequisites
 
-1. Telegram bot
-2. ezBookkeeping
+1. [Telegram bot](src/routers/telegram/README.en.md)
+2. [ezBookkeeping](https://github.com/mayswind/ezbookkeeping)
 
 On the server hosting ezBookkeeping, clone this repository:
 

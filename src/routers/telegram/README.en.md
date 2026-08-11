@@ -1,4 +1,4 @@
-[English](README.en.md) | [Español](README.md)
+English | [Español](README.md)
 
 # Creating a Telegram Bot
 
