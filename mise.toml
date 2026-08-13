@@ -21,6 +21,10 @@ curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
 description = "Deploy the FastAPI server in production mode"
 run = "uv run uvicorn main:app --app-dir src --host 0.0.0.0 --port 8000"
 
+[tasks.db-migrate]
+description = "Apply database migrations"
+run = "uv run python src/migrate.py"
+
 [tasks.verify-webhook]
 description = "Verify state of the webhook"
 run = 'curl "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"'
