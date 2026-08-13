@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS user_categories (
 
 MIGRATIONS = [
     (1, "ALTER TABLE user_accounts ADD COLUMN hints TEXT NOT NULL DEFAULT ''"),
+    (2, "ALTER TABLE user_accounts ADD COLUMN category INTEGER NOT NULL DEFAULT 0"),
 ]
 
 
