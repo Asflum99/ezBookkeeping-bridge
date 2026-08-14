@@ -18,6 +18,9 @@ class TestRegisterTransaction:
         "payment_account": "billetera_digital",
         "category": "Comida",
         "comment": "Tambo",
+        "transaction_type": 3,
+        "category_id": "3826101146502561820",
+        "destination_account_id": None,
     }
 
     VALID_USER_INFO: ClassVar = {
@@ -30,21 +33,23 @@ class TestRegisterTransaction:
         "sanitized_data, user_info",
         [
             (
-                {"payment_account": "billetera_digital"},
+                {"amount": 10, "date_time": "2026-07-19 12:00:00", "payment_account": "billetera_digital", "transaction_type": 3},
                 {
+                    "ez_token": "fake-token",
                     "categorias": {"Comida": "123"},
                     "cuentas": {"billetera_digital": "321"},
                 },
             ),
             (
-                {"category": "Ropa", "payment_account": "billetera_digital"},
+                {"amount": 10, "date_time": "2026-07-19 12:00:00", "category": "Ropa", "payment_account": "billetera_digital", "transaction_type": 3, "category_id": "999"},
                 {
+                    "ez_token": "fake-token",
                     "categorias": {"Comida": "123"},
                     "cuentas": {"billetera_digital": "321"},
                 },
             ),
         ],
-        ids=["missing_category", "category_not_in_user_categories"],
+        ids=["missing_category_id", "category_id_not_in_user_categories"],
     )
     async def test_category_lookup_fails(self, sanitized_data, user_info):
         result = await register_transaction(sanitized_data, user_info)
@@ -54,12 +59,13 @@ class TestRegisterTransaction:
         "sanitized_data, user_info",
         [
             (
-                {"category": "Comida"},
-                {"categorias": {"Comida": "123"}},
+                {"amount": 10, "date_time": "2026-07-19 12:00:00", "category": "Comida", "transaction_type": 3, "category_id": "123"},
+                {"ez_token": "fake-token", "categorias": {"Comida": "123"}},
             ),
             (
-                {"category": "Comida", "payment_account": "efectivo"},
+                {"amount": 10, "date_time": "2026-07-19 12:00:00", "category": "Comida", "payment_account": "efectivo", "transaction_type": 3, "category_id": "123"},
                 {
+                    "ez_token": "fake-token",
                     "categorias": {"Comida": "123"},
                     "cuentas": {"billetera_digital": "321"},
                 },

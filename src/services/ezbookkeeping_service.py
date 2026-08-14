@@ -16,22 +16,19 @@ async def register_transaction(
     Expects sanitized_data from validate_and_sanitize_voucher_data:
     - amount: int (cents, > 0)
     - date_time: str ("%Y-%m-%d %H:%M:%S", America/Lima)
-    - category: str (valid category name)
     - payment_account: str (valid account name)
     - comment: str
+    - transaction_type: int (3 or 4)
+    - category_id: str (resolved category ID)
+    - destination_account_id: str | None (for type 4 transfers)
     """
     logger.info("Starting transaction registration in ezBookkeeping.")
     url = f"{settings.ezbookkeeping_url}/api/v1/transactions/add.json"
 
-    category_name = sanitized_data.get("category")
-    user_categories = user_info.get("categorias", {})
-
-    category_id = user_categories.get(category_name)
+    transaction_type = sanitized_data.get("transaction_type", 3)
+    category_id = sanitized_data.get("category_id")
     if not category_id:
-        logger.error(
-            f"❌ Failed to resolve category ID for name: '{category_name}'. "
-            f"Allowed user categories: {list(user_categories.keys())}"
-        )
+        logger.error("❌ Failed to resolve category ID.")
         return False
 
     payment_account = sanitized_data.get("payment_account")
@@ -61,7 +58,7 @@ async def register_transaction(
     }
 
     body = {
-        "type": 3,
+        "type": transaction_type,
         "categoryId": category_id,
         "sourceAmount": amount_cents,
         "time": unix_timestamp,
@@ -69,6 +66,15 @@ async def register_transaction(
         "sourceAccountId": source_account_id,
         "utcOffset": -300,
     }
+
+    # Type 4: Transfer — add destination account and amount
+    if transaction_type == 4:
+        destination_account_id = sanitized_data.get("destination_account_id")
+        if not destination_account_id:
+            logger.error("❌ Type 4 transfer missing destination_account_id.")
+            return False
+        body["destinationAccountId"] = destination_account_id
+        body["destinationAmount"] = amount_cents
 
     logger.debug(f"Submitting transaction with payload: {body}")
 
