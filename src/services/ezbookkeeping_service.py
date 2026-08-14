@@ -135,9 +135,8 @@ async def _fetch_ez_list(
         return None
 
 
-def _flatten_expense_categories(raw: dict) -> list[dict]:
-    """Extract expense categories (type 2) from grouped response, flatten hierarchy."""
-    expense_categories = raw.get("2", [])
+def _flatten_categories(raw: dict) -> list[dict]:
+    """Extract expense (type 2) and transfer (type 3) categories, flatten hierarchy."""
     result = []
 
     def flatten(cats, parent_name=""):
@@ -147,7 +146,8 @@ def _flatten_expense_categories(raw: dict) -> list[dict]:
             if cat.get("subCategories"):
                 flatten(cat["subCategories"], name)
 
-    flatten(expense_categories)
+    for category_type in ("2", "3"):
+        flatten(raw.get(category_type, []))
     return result
 
 
@@ -160,5 +160,5 @@ async def get_user_categories(ez_token: str) -> list[dict] | None:
         ez_token,
         "/api/v1/transaction/categories/list.json",
         "categories",
-        extract_fn=_flatten_expense_categories,
+        extract_fn=_flatten_categories,
     )
