@@ -32,12 +32,12 @@ class UserRepository:
             accounts_with_hints = []
 
             for acc in conn.execute(
-                "SELECT name, ez_account_id, hints FROM user_accounts WHERE user_id = ?",
+                "SELECT name, ez_account_id, hints, category FROM user_accounts WHERE user_id = ?",
                 (telegram_id,),
             ):
                 accounts[acc["name"]] = acc["ez_account_id"]
                 hint_text = acc["hints"] if acc["hints"] else acc["name"]
-                accounts_with_hints.append((acc["name"], hint_text))
+                accounts_with_hints.append((acc["name"], hint_text, acc["category"]))
 
             # Get categories
             categories = {}
@@ -68,22 +68,25 @@ class UserRepository:
         remote_items: list[dict],
         label: str,
         extra_insert_cols: dict[str, str] | None = None,
+        item_extract_fn: Callable[[dict], dict] | None = None,
     ) -> dict:
         """Generic sync: local SQLite table ↔ remote ezBookkeeping items."""
         logger.info(f"Syncing {label.lower()}s for user {telegram_id}")
-        remote_map = {item["id"]: item["name"] for item in remote_items}
+        remote_map = {item["id"]: item for item in remote_items}
         remote_ids = set(remote_map.keys())
         logger.debug(f"Remote ids: {remote_ids}")
 
         with get_db(self._db_path) as conn:
+            select_extra = ", category" if item_extract_fn else ""
             local_rows = conn.execute(
-                f"SELECT name, {id_column} FROM {table} WHERE user_id = ?",
+                f"SELECT name, {id_column}{select_extra} FROM {table} WHERE user_id = ?",
                 (telegram_id,),
             ).fetchall()
 
             local_ids = {row[id_column] for row in local_rows}
             logger.debug(f"Local ids: {local_ids}")
-            local_names = {row[id_column]: row["name"] for row in local_rows}
+            local_by_id = {row[id_column]: dict(row) for row in local_rows}
+            local_names = {eid: r["name"] for eid, r in local_by_id.items()}
             logger.debug(f"Local names: {local_names}")
 
             to_remove = local_ids - remote_ids
@@ -96,11 +99,14 @@ class UserRepository:
 
             to_add = remote_ids - local_ids
             added = []
-            extra_cols = extra_insert_cols or {}
-            col_names = ", ".join(extra_cols.keys())
-            placeholders = ", ".join(["?"] * len(extra_cols))
             for ez_id in to_add:
-                name = remote_map[ez_id]
+                name = remote_map[ez_id]["name"]
+                if item_extract_fn:
+                    extra_cols = item_extract_fn(remote_map[ez_id])
+                else:
+                    extra_cols = extra_insert_cols or {}
+                col_names = ", ".join(extra_cols.keys())
+                placeholders = ", ".join(["?"] * len(extra_cols))
                 logger.debug(
                     f"Adding {label.lower()} {name} ({ez_id}) for user {telegram_id}"
                 )
@@ -114,18 +120,37 @@ class UserRepository:
             to_update = local_ids & remote_ids
             updated = []
             for ez_id in to_update:
-                local_name = local_names[ez_id]
-                remote_name = remote_map[ez_id]
+                remote_item = remote_map[ez_id]
+                remote_name = remote_item["name"]
+                local_name = local_by_id[ez_id]["name"]
+
+                sets = {}
                 if local_name != remote_name:
-                    logger.debug(
-                        f"Updating {label.lower()} {ez_id}: {local_name} → {remote_name}"
-                    )
+                    sets["name"] = remote_name
+
+                if item_extract_fn:
+                    extra = item_extract_fn(remote_item)
+                    local_val = local_by_id[ez_id].get("category")
+                    remote_val = extra.get("category")
+                    if remote_val is not None and remote_val != local_val:
+                        sets["category"] = remote_val
+
+                if sets:
+                    set_clause = ", ".join(f"{k} = ?" for k in sets)
+                    logger.debug(f"Updating {label.lower()} {ez_id}: {sets}")
                     conn.execute(
-                        f"UPDATE {table} SET name = ? WHERE user_id = ? AND {id_column} = ?",
-                        (remote_name, telegram_id, ez_id),
+                        f"UPDATE {table} SET {set_clause} WHERE user_id = ? AND {id_column} = ?",
+                        (*sets.values(), telegram_id, ez_id),
                     )
                     updated.append(
-                        {"id": ez_id, "old_name": local_name, "new_name": remote_name}
+                        {
+                            "id": ez_id,
+                            **(
+                                {"old_name": local_name, "new_name": remote_name}
+                                if "name" in sets
+                                else {}
+                            ),
+                        }
                     )
 
             removed = [local_names[eid] for eid in to_remove]
@@ -143,7 +168,10 @@ class UserRepository:
             "ez_account_id",
             remote_accounts,
             "Account",
-            extra_insert_cols={"hints": ""},
+            item_extract_fn=lambda item: {
+                "hints": "",
+                "category": item["category"],
+            },
         )
 
     def sync_categories(self, telegram_id: int, remote_categories: list[dict]) -> dict:

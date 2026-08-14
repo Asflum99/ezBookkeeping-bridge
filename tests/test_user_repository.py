@@ -59,7 +59,7 @@ class TestGetUser:
         assert result["ez_token"] == "fake-token"
         assert result["cuentas"] == {"billetera_digital": "acc-123"}
         assert result["cuentas_hints"] == [
-            ("billetera_digital", "Yape, BCP Transfer, purple")
+            ("billetera_digital", "Yape, BCP Transfer, purple", 0)
         ]
         assert result["categorias"] == {"Comida": "cat-456"}
 
@@ -89,7 +89,10 @@ class TestSyncAccounts:
             self._seed_user(conn, 12345)
 
         repo = UserRepository(db_path=db)
-        remote = [{"id": "acc-1", "name": "BCP"}, {"id": "acc-2", "name": "Yape"}]
+        remote = [
+            {"id": "acc-1", "name": "BCP (Crédito)", "category": 3},
+            {"id": "acc-2", "name": "Yape", "category": 2},
+        ]
 
         result = repo.sync_accounts(12345, remote)
 
@@ -106,7 +109,7 @@ class TestSyncAccounts:
             )
 
         repo = UserRepository(db_path=db)
-        remote = [{"id": "acc-new", "name": "Yape"}]
+        remote = [{"id": "acc-new", "name": "Yape", "category": 2}]
 
         result = repo.sync_accounts(12345, remote)
 
@@ -125,25 +128,29 @@ class TestSyncAccounts:
             )
 
         repo = UserRepository(db_path=db)
-        remote = [{"id": "acc-1", "name": "BCP (Débito)"}]
+        remote = [{"id": "acc-1", "name": "BCP (Débito)", "category": 2}]
 
         result = repo.sync_accounts(12345, remote)
 
         assert len(result["added"]) == 0
         assert len(result["removed"]) == 0
         assert len(result["updated"]) == 1
-        assert result["updated"][0] == {"id": "acc-1", "old_name": "BCP", "new_name": "BCP (Débito)"}
+        assert result["updated"][0] == {
+            "id": "acc-1",
+            "old_name": "BCP",
+            "new_name": "BCP (Débito)",
+        }
 
     def test_no_changes(self, db):
         with get_db(db) as conn:
             self._seed_user(conn, 12345)
             conn.execute(
-                "INSERT INTO user_accounts (user_id, name, ez_account_id, hints) VALUES (?, ?, ?, ?)",
-                (12345, "BCP", "acc-1", "hint"),
+                "INSERT INTO user_accounts (user_id, name, ez_account_id, hints, category) VALUES (?, ?, ?, ?, ?)",
+                (12345, "Interbank", "acc-1", "hint", 2),
             )
 
         repo = UserRepository(db_path=db)
-        remote = [{"id": "acc-1", "name": "BCP"}]
+        remote = [{"id": "acc-1", "name": "Interbank", "category": 2}]
 
         result = repo.sync_accounts(12345, remote)
 
