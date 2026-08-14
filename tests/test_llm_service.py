@@ -18,8 +18,8 @@ class TestBuildSystemPrompt:
     def test_categories_and_accounts_injection(self):
         categories = ["Comida", "Transporte"]
         accounts = [
-            ("BCP Débito", "Yape, morado"),
-            ("Interbank Débito", "Plin, verde"),
+            ("BCP Débito", "Yape, morado", 2),
+            ("Interbank Débito", "Plin, verde", 2),
         ]
 
         result = build_system_prompt(categories, accounts)
@@ -42,7 +42,7 @@ class TestBuildSystemPrompt:
 
     def test_special_characters_in_accounts_and_hints(self):
         categories = ["Niños"]
-        accounts = [("Línea 1 Tren", "Tren Lima, estación & tarjeta")]
+        accounts = [("Línea 1 Tren", "Tren Lima, estación & tarjeta", 2)]
 
         result = build_system_prompt(categories, accounts)
 
@@ -217,7 +217,7 @@ class TestProcessExpenseWithAi:
             process_expense_with_ai(
                 "/nonexistent/path.jpg",
                 ["Comida"],
-                [("BCP Débito", "Yape, BCP transfer, morado")],
+                [("BCP Débito", "Yape, BCP transfer, morado", 2)],
             )
 
     def test_calls_llm_with_correct_messages(self, tmp_path, mocker):
@@ -243,7 +243,7 @@ class TestProcessExpenseWithAi:
         result = process_expense_with_ai(
             str(image_file),
             ["Comida", "Ropa"],
-            [("BCP Débito", "Yape, BCP transfer, morado")],
+            [("BCP Débito", "Yape, BCP transfer, morado", 2)],
         )
 
         assert result == {"amount": 100}
