@@ -6,11 +6,12 @@ SAMPLE_PHOTO = {
     "file_size": 1048576,
 }
 
+
 VALID_USER_INFO = {
     "nombre": "Test User",
     "ez_token": "fake-jwt-token",
-    "cuentas": {"billetera_digital": "3826102909318201344"},
-    "cuentas_hints": [("billetera_digital", "Yape, BCP Transfer, morado")],
+    "cuentas": {"BCP": "3826102909318201344"},
+    "cuentas_hints": [("BCP", "Yape, BCP Transfer, morado", 2)],
     "categorias": {"Comida": "3826101146502561820"},
 }
 

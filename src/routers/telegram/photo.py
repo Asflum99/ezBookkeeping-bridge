@@ -39,7 +39,9 @@ async def handle_photo(
         raw_llm_data = process_expense_with_ai(
             local_photo_path, user_categories, user_accounts_hints
         )
-        sanitized_data = validate_and_sanitize_voucher_data(raw_llm_data)
+        sanitized_data = validate_and_sanitize_voucher_data(
+            raw_llm_data, user_info, user_accounts_hints, user_categories
+        )
 
         transaction_registered = await register_transaction(sanitized_data, user_info)
 
