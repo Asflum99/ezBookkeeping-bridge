@@ -11,8 +11,8 @@ def resolve_transaction_type(
 ) -> int:
     """Returns 4 if destination_account matches a user account hint, else 3."""
     if 4 in types and destination_account:
-        for _, hints, _ in user_accounts_hints:
-            if destination_account in hints:
+        for name, _, _ in user_accounts_hints:
+            if destination_account in name:
                 return 4
     return 3
 
@@ -67,7 +67,7 @@ def validate_and_sanitize_voucher_data(
         dest_account_id = None
         dest_account_category = 0
         for account_name, hints, category in user_accounts_hints:
-            if destination_account in hints:
+            if cast(str, destination_account) in hints:
                 dest_account_id = user_info.get("cuentas", {}).get(account_name)
                 dest_account_category = category
                 break
@@ -147,14 +147,25 @@ def prepare_confirmation_message(sanitized_data: dict[str, Any]) -> str:
 
     payment_account = sanitized_data.get("payment_account", "❓ Desconocido")
 
-    category_name = sanitized_data.get("category", "❓ Desconocida")
+    transaction_type = sanitized_data.get("transaction_type", 3)
+
+    if transaction_type == 4:
+        dest_category = sanitized_data.get("destination_account_category", 0)
+        if dest_category == 3:  # Credit Card
+            header = "✅ ¡Tarjeta de crédito pagada con éxito!"
+        else:
+            header = "✅ ¡Transferencia registrada con éxito!"
+        category_line = ""
+    else:
+        header = "✅ ¡Gasto registrado con éxito!"
+        category_name = sanitized_data.get("category", "❓ Desconocida")
+        category_line = f"\n🏷️ Categoría: {category_name}"
 
     message = (
-        f"✅ ¡Gasto registrado con éxito!\n\n"
+        f"{header}\n\n"
         f"💰 Monto: S/. {amount}\n"
         f"📝 Descripción: {comment}\n"
         f"📅 Fecha: {formatted_date}\n"
-        f"💳 Cuenta de pago: {payment_account}\n"
-        f"🏷️ Categoría: {category_name}"
+        f"💳 Cuenta de pago: {payment_account}{category_line}"
     )
     return message
