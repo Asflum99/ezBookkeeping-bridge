@@ -10,6 +10,29 @@ from services.ezbookkeeping_service import (
     register_transaction,
 )
 
+TRANSFER_SANITIZED_DATA = {
+    "amount": 100.00,
+    "date_time": "2026-07-19 12:30:00",
+    "payment_account": "billetera_digital",
+    "category": None,
+    "comment": "Pago tarjeta",
+    "transaction_type": 4,
+    "category_id": "3826101146502561822",
+    "destination_account_id": "3826102909318201345",
+}
+
+TRANSFER_USER_INFO = {
+    "ez_token": "fake-jwt-token",
+    "cuentas": {
+        "billetera_digital": "3826102909318201344",
+        "tarjeta_ripley": "3826102909318201345",
+    },
+    "categorias": {
+        "Transferencia Bancaria": "3826101146502561821",
+        "Pago de Tarjetas de Crédito": "3826101146502561822",
+    },
+}
+
 
 class TestRegisterTransaction:
     VALID_SANITIZED_DATA: ClassVar = {
@@ -33,7 +56,12 @@ class TestRegisterTransaction:
         "sanitized_data, user_info",
         [
             (
-                {"amount": 10, "date_time": "2026-07-19 12:00:00", "payment_account": "billetera_digital", "transaction_type": 3},
+                {
+                    "amount": 10,
+                    "date_time": "2026-07-19 12:00:00",
+                    "payment_account": "billetera_digital",
+                    "transaction_type": 3,
+                },
                 {
                     "ez_token": "fake-token",
                     "categorias": {"Comida": "123"},
@@ -41,7 +69,14 @@ class TestRegisterTransaction:
                 },
             ),
             (
-                {"amount": 10, "date_time": "2026-07-19 12:00:00", "category": "Ropa", "payment_account": "billetera_digital", "transaction_type": 3, "category_id": "999"},
+                {
+                    "amount": 10,
+                    "date_time": "2026-07-19 12:00:00",
+                    "category": "Ropa",
+                    "payment_account": "billetera_digital",
+                    "transaction_type": 3,
+                    "category_id": "999",
+                },
                 {
                     "ez_token": "fake-token",
                     "categorias": {"Comida": "123"},
@@ -59,11 +94,24 @@ class TestRegisterTransaction:
         "sanitized_data, user_info",
         [
             (
-                {"amount": 10, "date_time": "2026-07-19 12:00:00", "category": "Comida", "transaction_type": 3, "category_id": "123"},
+                {
+                    "amount": 10,
+                    "date_time": "2026-07-19 12:00:00",
+                    "category": "Comida",
+                    "transaction_type": 3,
+                    "category_id": "123",
+                },
                 {"ez_token": "fake-token", "categorias": {"Comida": "123"}},
             ),
             (
-                {"amount": 10, "date_time": "2026-07-19 12:00:00", "category": "Comida", "payment_account": "efectivo", "transaction_type": 3, "category_id": "123"},
+                {
+                    "amount": 10,
+                    "date_time": "2026-07-19 12:00:00",
+                    "category": "Comida",
+                    "payment_account": "efectivo",
+                    "transaction_type": 3,
+                    "category_id": "123",
+                },
                 {
                     "ez_token": "fake-token",
                     "categorias": {"Comida": "123"},
@@ -135,6 +183,52 @@ class TestRegisterTransaction:
             self.VALID_SANITIZED_DATA, self.VALID_USER_INFO
         )
 
+        assert result is False
+
+    @respx.mock
+    async def test_type_4_transfer_success(self, _mock_ezbookkeeping_url):
+        respx.post("http://test/api/v1/transactions/add.json").mock(
+            return_value=httpx.Response(200, json={"success": True})
+        )
+
+        result = await register_transaction(TRANSFER_SANITIZED_DATA, TRANSFER_USER_INFO)
+
+        assert result is True
+
+    @respx.mock
+    async def test_type_4_transfer_includes_destination_fields(
+        self, _mock_ezbookkeeping_url
+    ):
+        mock = respx.post("http://test/api/v1/transactions/add.json").mock(
+            return_value=httpx.Response(200, json={"success": True})
+        )
+
+        await register_transaction(TRANSFER_SANITIZED_DATA, TRANSFER_USER_INFO)
+
+        body = mock.calls[0].request.content
+        import json
+
+        payload = json.loads(body)
+        assert payload["type"] == 4
+        assert payload["destinationAccountId"] == "3826102909318201345"
+        assert payload["destinationAmount"] == 10000
+
+    async def test_type_4_missing_destination_fails(self):
+        data = {
+            "amount": 100,
+            "date_time": "2026-07-19 12:00:00",
+            "payment_account": "billetera_digital",
+            "transaction_type": 4,
+            "category_id": "123",
+            "destination_account_id": None,
+        }
+        user_info = {
+            "ez_token": "fake-token",
+            "cuentas": {"billetera_digital": "321"},
+            "categorias": {},
+        }
+
+        result = await register_transaction(data, user_info)
         assert result is False
 
 

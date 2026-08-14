@@ -1,16 +1,22 @@
 from datetime import datetime, timedelta
+from typing import cast
 
 import pytest
 from helpers import VALID_USER_INFO
 
 from config import settings
 from formatter import (
+    get_transfer_category_id,
     prepare_confirmation_message,
+    resolve_transaction_type,
     validate_and_sanitize_voucher_data,
 )
 
-VALID_HINTS = VALID_USER_INFO["cuentas_hints"]
-VALID_CATEGORIES = VALID_USER_INFO["categorias"]
+VALID_HINTS = cast(
+    list[tuple[str, str, int]],
+    VALID_USER_INFO["cuentas_hints"],
+)
+VALID_CATEGORIES = cast(dict[str, str], VALID_USER_INFO["categorias"])
 
 
 class TestValidateAndSanitizeVoucherData:
@@ -300,3 +306,89 @@ class TestPrepareConfirmationMessage:
         data = {"amount": 10, "payment_account": "efectivo"}
         msg = prepare_confirmation_message(data)
         assert "efectivo" in msg
+
+
+class TestResolveTransactionType:
+    """Tests for resolve_transaction_type function."""
+
+    def test_type_4_with_hint_match(self):
+        hints = [("tarjeta_ripley", "Ripley, 4821, tarjeta", 3)]
+        result = resolve_transaction_type([3, 4], "4821", hints)
+        assert result == 4
+
+    def test_type_4_no_hint_match(self):
+        hints = [("tarjeta_ripley", "Ripley, 4821, tarjeta", 3)]
+        result = resolve_transaction_type([3, 4], "9999", hints)
+        assert result == 3
+
+    def test_type_4_no_destination_account(self):
+        hints = [("tarjeta_ripley", "Ripley, 4821, tarjeta", 3)]
+        result = resolve_transaction_type([3, 4], None, hints)
+        assert result == 3
+
+    def test_type_3_only(self):
+        hints = [("tarjeta_ripley", "Ripley, 4821, tarjeta", 3)]
+        result = resolve_transaction_type([3], "4821", hints)
+        assert result == 3
+
+
+class TestGetTransferCategoryId:
+    """Tests for get_transfer_category_id function."""
+
+    def test_credit_card_destination(self):
+        categories = {
+            "Transferencia Bancaria": "123",
+            "Pago de Tarjetas de Crédito": "456",
+        }
+        result = get_transfer_category_id(3, categories)
+        assert result == "456"
+
+    def test_other_destination(self):
+        categories = {
+            "Transferencia Bancaria": "123",
+            "Pago de Tarjetas de Crédito": "456",
+        }
+        result = get_transfer_category_id(2, categories)
+        assert result == "123"
+
+    def test_default_category(self):
+        categories = {"Transferencia Bancaria": "123"}
+        result = get_transfer_category_id(0, categories)
+        assert result == "123"
+
+
+class TestValidateType4Transfer:
+    """Tests for type 4 transfer validation."""
+
+    def test_type_4_skips_category_requirement(self):
+        now_str = datetime.now(settings.timezone).strftime("%Y-%m-%d %H:%M:%S")
+        data = {
+            "amount": 100,
+            "date_time": now_str,
+            "payment_account": "billetera_digital",
+            "types": [3, 4],
+            "destination_account": "4821",
+        }
+
+        result = validate_and_sanitize_voucher_data(
+            data, VALID_USER_INFO, VALID_HINTS, VALID_CATEGORIES
+        )
+
+        assert result["transaction_type"] == 4
+        assert result["category"] is None
+        assert result["destination_account_id"] == "3826102909318201345"
+        assert result["category_id"] == None
+
+    def test_type_3_requires_category(self):
+        now_str = datetime.now(settings.timezone).strftime("%Y-%m-%d %H:%M:%S")
+        data = {
+            "amount": 100,
+            "date_time": now_str,
+            "payment_account": "billetera_digital",
+            "types": [3],
+        }
+
+        with pytest.raises(ValueError, match="Category is required"):
+            validate_and_sanitize_voucher_data(
+                data, VALID_USER_INFO, VALID_HINTS, VALID_CATEGORIES
+            )

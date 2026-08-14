@@ -11,8 +11,8 @@ def resolve_transaction_type(
 ) -> int:
     """Returns 4 if destination_account matches a user account hint, else 3."""
     if 4 in types and destination_account:
-        for name, _, _ in user_accounts_hints:
-            if destination_account in name:
+        for _, hints, _ in user_accounts_hints:
+            if destination_account in hints:
                 return 4
     return 3
 
@@ -22,7 +22,7 @@ def get_transfer_category_id(
     user_categories: dict[str, str],
 ) -> str | None:
     """Returns transfer category ID based on destination account type."""
-    if destination_account_category == 3:  # Credit Card
+    if destination_account_category == 3:
         return user_categories.get("Pago de Tarjetas de Crédito")
     else:
         return user_categories.get("Transferencia Bancaria")
@@ -81,7 +81,6 @@ def validate_and_sanitize_voucher_data(
         if not category:
             logger.error("Category is missing from LLM extraction.")
             raise ValueError("Category is required but not provided.")
-        user_categories = user_info.get("categorias", {})
         sanitized_data["category_id"] = user_categories.get(category)
         sanitized_data["destination_account_id"] = None
 
