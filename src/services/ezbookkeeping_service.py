@@ -107,77 +107,61 @@ async def register_transaction(
         return False
 
 
-async def get_user_accounts(ez_token: str) -> list[dict] | None:
-    """Fetch all accounts from ezBookkeeping for the given user."""
-    url = f"{settings.ezbookkeeping_url}/api/v1/accounts/list.json"
+async def _fetch_ez_list(
+    ez_token: str,
+    endpoint: str,
+    label: str,
+    extract_fn=None,
+) -> list[dict] | None:
+    """Generic GET list from ezBookkeeping API."""
+    url = f"{settings.ezbookkeeping_url}{endpoint}"
     headers = {"Authorization": f"Bearer {ez_token}"}
-
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=headers, timeout=10.0)
-
             if response.status_code != 200:
                 logger.error(
-                    f"ezBookkeeping accounts API error. Status: {response.status_code}"
+                    f"ezBookkeeping {label} API error. Status: {response.status_code}"
                 )
                 return None
-
             res_json = response.json()
             if not res_json.get("success"):
-                logger.error("ezBookkeeping accounts API returned success=false")
+                logger.error(f"ezBookkeeping {label} API returned success=false")
                 return None
-
-            return res_json["result"]
-
+            result = res_json["result"]
+            return extract_fn(result) if extract_fn else result
     except httpx.HTTPError as e:
-        logger.exception(f"Network or HTTP error fetching accounts: {e}")
+        logger.exception(f"Network or HTTP error fetching {label}: {e}")
         return None
     except (ValueError, KeyError) as e:
         logger.exception(f"Invalid JSON payload received from ezBookkeeping: {e}")
         return None
+
+
+def _flatten_expense_categories(raw: dict) -> list[dict]:
+    """Extract expense categories (type 2) from grouped response, flatten hierarchy."""
+    expense_categories = raw.get("2", [])
+    result = []
+
+    def flatten(cats, parent_name=""):
+        for cat in cats:
+            name = f"{parent_name} > {cat['name']}" if parent_name else cat["name"]
+            result.append({"id": cat["id"], "name": name})
+            if cat.get("subCategories"):
+                flatten(cat["subCategories"], name)
+
+    flatten(expense_categories)
+    return result
+
+
+async def get_user_accounts(ez_token: str) -> list[dict] | None:
+    return await _fetch_ez_list(ez_token, "/api/v1/accounts/list.json", "accounts")
 
 
 async def get_user_categories(ez_token: str) -> list[dict] | None:
-    """Fetch expense categories from ezBookkeeping for the given user."""
-    url = f"{settings.ezbookkeeping_url}/api/v1/transaction/categories/list.json"
-    headers = {"Authorization": f"Bearer {ez_token}"}
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=headers, timeout=10.0)
-
-            if response.status_code != 200:
-                logger.error(
-                    f"ezBookkeeping categories API error. Status: {response.status_code}"
-                )
-                return None
-
-            res_json = response.json()
-            if not res_json.get("success"):
-                logger.error("ezBookkeeping categories API returned success=false")
-                return None
-
-            # Response is grouped by type: {"1": [...], "2": [...], "3": [...]}
-            # Type 2 = Expense
-            categories_by_type = res_json["result"]
-            expense_categories = categories_by_type.get("2", [])
-
-            # Flatten hierarchy with arrow separator
-            result = []
-
-            def flatten(cats, parent_name=""):
-                for cat in cats:
-                    name = f"{parent_name} > {cat['name']}" if parent_name else cat["name"]
-                    result.append({"id": cat["id"], "name": name})
-                    if cat.get("subCategories"):
-                        flatten(cat["subCategories"], name)
-
-            flatten(expense_categories)
-            return result
-
-    except httpx.HTTPError as e:
-        logger.exception(f"Network or HTTP error fetching categories: {e}")
-        return None
-    except (ValueError, KeyError) as e:
-        logger.exception(f"Invalid JSON payload received from ezBookkeeping: {e}")
-        return None
+    return await _fetch_ez_list(
+        ez_token,
+        "/api/v1/transaction/categories/list.json",
+        "categories",
+        extract_fn=_flatten_expense_categories,
+    )
