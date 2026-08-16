@@ -125,7 +125,7 @@ class TestTelegramWebhook:
 
     def test_update_accounts_command(self, mocker):
         mocker.patch(
-            "routers.telegram.accounts.get_user_accounts",
+            "routers.telegram.sync.get_user_accounts",
             return_value=[{"id": "acc-1", "name": "BCP"}],
         )
         user_repo = mocker.MagicMock()
