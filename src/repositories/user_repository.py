@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -59,122 +60,98 @@ class UserRepository:
             )
             return user_config
 
-    def sync_accounts(self, telegram_id: int, remote_accounts: list[dict]) -> dict:
-        """Sync local user_accounts with remote ezBookkeeping accounts."""
-        logger.info(f"Syncing accounts for user {telegram_id}")
-        remote_map = {acc["id"]: acc["name"] for acc in remote_accounts}
+    def _sync_local_remote(
+        self,
+        telegram_id: int,
+        table: str,
+        id_column: str,
+        remote_items: list[dict],
+        label: str,
+        extra_insert_cols: dict[str, str] | None = None,
+    ) -> dict:
+        """Generic sync: local SQLite table ↔ remote ezBookkeeping items."""
+        logger.info(f"Syncing {label.lower()}s for user {telegram_id}")
+        remote_map = {item["id"]: item["name"] for item in remote_items}
         remote_ids = set(remote_map.keys())
         logger.debug(f"Remote ids: {remote_ids}")
 
         with get_db(self._db_path) as conn:
             local_rows = conn.execute(
-                "SELECT name, ez_account_id FROM user_accounts WHERE user_id = ?",
+                f"SELECT name, {id_column} FROM {table} WHERE user_id = ?",
                 (telegram_id,),
             ).fetchall()
 
-            local_ids = {row["ez_account_id"] for row in local_rows}
+            local_ids = {row[id_column] for row in local_rows}
             logger.debug(f"Local ids: {local_ids}")
-            local_names = {row["ez_account_id"]: row["name"] for row in local_rows}
+            local_names = {row[id_column]: row["name"] for row in local_rows}
             logger.debug(f"Local names: {local_names}")
 
-            # Remove accounts no longer in remote
             to_remove = local_ids - remote_ids
             for ez_id in to_remove:
-                logger.debug(f"Removing account {ez_id} for user {telegram_id}")
+                logger.debug(f"Removing {label.lower()} {ez_id} for user {telegram_id}")
                 conn.execute(
-                    "DELETE FROM user_accounts WHERE user_id = ? AND ez_account_id = ?",
+                    f"DELETE FROM {table} WHERE user_id = ? AND {id_column} = ?",
                     (telegram_id, ez_id),
                 )
 
-            # Add accounts not in local
             to_add = remote_ids - local_ids
             added = []
+            extra_cols = extra_insert_cols or {}
+            col_names = ", ".join(extra_cols.keys())
+            placeholders = ", ".join(["?"] * len(extra_cols))
             for ez_id in to_add:
                 name = remote_map[ez_id]
-                logger.debug(f"Adding account {name} ({ez_id}) for user {telegram_id}")
+                logger.debug(
+                    f"Adding {label.lower()} {name} ({ez_id}) for user {telegram_id}"
+                )
                 conn.execute(
-                    "INSERT INTO user_accounts (user_id, name, ez_account_id, hints) VALUES (?, ?, ?, ?)",
-                    (telegram_id, name, ez_id, ""),
+                    f"INSERT INTO {table} (user_id, name, {id_column}{', ' + col_names if col_names else ''}) "
+                    f"VALUES (?, ?, ?{', ' + placeholders if placeholders else ''})",
+                    (telegram_id, name, ez_id, *extra_cols.values()),
                 )
                 added.append({"id": ez_id, "name": name})
 
-            # Update accounts that exist in both but have different names
             to_update = local_ids & remote_ids
             updated = []
             for ez_id in to_update:
                 local_name = local_names[ez_id]
                 remote_name = remote_map[ez_id]
                 if local_name != remote_name:
-                    logger.debug(f"Updating account {ez_id}: {local_name} → {remote_name}")
+                    logger.debug(
+                        f"Updating {label.lower()} {ez_id}: {local_name} → {remote_name}"
+                    )
                     conn.execute(
-                        "UPDATE user_accounts SET name = ? WHERE user_id = ? AND ez_account_id = ?",
+                        f"UPDATE {table} SET name = ? WHERE user_id = ? AND {id_column} = ?",
                         (remote_name, telegram_id, ez_id),
                     )
-                    updated.append({"id": ez_id, "old_name": local_name, "new_name": remote_name})
+                    updated.append(
+                        {"id": ez_id, "old_name": local_name, "new_name": remote_name}
+                    )
 
             removed = [local_names[eid] for eid in to_remove]
 
         logger.info(
-            f"Account sync complete for user {telegram_id}: +{len(added)} -{len(removed)} ~{len(updated)}"
+            f"{label} sync complete for user {telegram_id}: +{len(added)} -{len(removed)} ~{len(updated)}"
         )
         return {"added": added, "removed": removed, "updated": updated}
+
+    def sync_accounts(self, telegram_id: int, remote_accounts: list[dict]) -> dict:
+        """Sync local user_accounts with remote ezBookkeeping accounts."""
+        return self._sync_local_remote(
+            telegram_id,
+            "user_accounts",
+            "ez_account_id",
+            remote_accounts,
+            "Account",
+            extra_insert_cols={"hints": ""},
+        )
 
     def sync_categories(self, telegram_id: int, remote_categories: list[dict]) -> dict:
         """Sync local user_categories with remote ezBookkeeping categories."""
-        logger.info(f"Syncing categories for user {telegram_id}")
-        remote_map = {cat["id"]: cat["name"] for cat in remote_categories}
-        remote_ids = set(remote_map.keys())
-        logger.debug(f"Remote ids: {remote_ids}")
-
-        with get_db(self._db_path) as conn:
-            local_rows = conn.execute(
-                "SELECT name, ez_category_id FROM user_categories WHERE user_id = ?",
-                (telegram_id,),
-            ).fetchall()
-
-            local_ids = {row["ez_category_id"] for row in local_rows}
-            logger.debug(f"Local ids: {local_ids}")
-            local_names = {row["ez_category_id"]: row["name"] for row in local_rows}
-            logger.debug(f"Local names: {local_names}")
-
-            # Remove categories no longer in remote
-            to_remove = local_ids - remote_ids
-            for ez_id in to_remove:
-                logger.debug(f"Removing category {ez_id} for user {telegram_id}")
-                conn.execute(
-                    "DELETE FROM user_categories WHERE user_id = ? AND ez_category_id = ?",
-                    (telegram_id, ez_id),
-                )
-
-            # Add categories not in local
-            to_add = remote_ids - local_ids
-            added = []
-            for ez_id in to_add:
-                name = remote_map[ez_id]
-                logger.debug(f"Adding category {name} ({ez_id}) for user {telegram_id}")
-                conn.execute(
-                    "INSERT INTO user_categories (user_id, name, ez_category_id) VALUES (?, ?, ?)",
-                    (telegram_id, name, ez_id),
-                )
-                added.append({"id": ez_id, "name": name})
-
-            # Update categories that exist in both but have different names
-            to_update = local_ids & remote_ids
-            updated = []
-            for ez_id in to_update:
-                local_name = local_names[ez_id]
-                remote_name = remote_map[ez_id]
-                if local_name != remote_name:
-                    logger.debug(f"Updating category {ez_id}: {local_name} → {remote_name}")
-                    conn.execute(
-                        "UPDATE user_categories SET name = ? WHERE user_id = ? AND ez_category_id = ?",
-                        (remote_name, telegram_id, ez_id),
-                    )
-                    updated.append({"id": ez_id, "old_name": local_name, "new_name": remote_name})
-
-            removed = [local_names[eid] for eid in to_remove]
-
-        logger.info(
-            f"Category sync complete for user {telegram_id}: +{len(added)} -{len(removed)} ~{len(updated)}"
+        return self._sync_local_remote(
+            telegram_id,
+            "user_categories",
+            "ez_category_id",
+            remote_categories,
+            "Category",
         )
-        return {"added": added, "removed": removed, "updated": updated}
