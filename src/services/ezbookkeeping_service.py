@@ -102,9 +102,6 @@ async def register_transaction(
             f"❌ Network or Timeout error connecting to ezBookkeeping: {e}"
         )
         return False
-    except Exception as e:
-        logger.exception(f"❌ Unexpected error in register_transaction: {e}")
-        return False
 
 
 async def _fetch_ez_list(

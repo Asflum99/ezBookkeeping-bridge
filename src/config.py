@@ -4,7 +4,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import colorlog
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # --- Main routes ---
@@ -40,8 +40,12 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     google_api_key: str = ""
 
-    # Providers supported
-    supported_providers: set[str] = {"groq", "openai", "anthropic", "gemini"}
+    _PROVIDER_API_KEY_FIELDS = {
+        "groq": "groq_api_key",
+        "openai": "openai_api_key",
+        "anthropic": "anthropic_api_key",
+        "gemini": "google_api_key",
+    }
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
@@ -60,26 +64,13 @@ class Settings(BaseSettings):
 
     @property
     def llm_api_key(self) -> str:
-        provider_map = {
-            "groq": self.groq_api_key,
-            "openai": self.openai_api_key,
-            "anthropic": self.anthropic_api_key,
-            "gemini": self.google_api_key,
-        }
-        key = provider_map.get(self.llm_provider, "")
+        field = self._PROVIDER_API_KEY_FIELDS.get(self.llm_provider)
+        if not field:
+            raise ValueError(f"Unsupported LLM provider: '{self.llm_provider}'")
+        key = getattr(self, field)
         if not key:
             raise ValueError(f"Missing API key for LLM provider '{self.llm_provider}'")
         return key
-
-    @field_validator("llm_provider")
-    @classmethod
-    def validate_provider(cls, v: str) -> str:
-        valid = {"groq", "openai", "anthropic", "gemini"}
-        if v not in valid:
-            raise ValueError(
-                f"LLM_PROVIDER '{v}' not supported. Must be one of: {valid}"
-            )
-        return v
 
     @property
     def system_prompt_template(self) -> str:
@@ -118,7 +109,7 @@ def setup_logger() -> logging.Logger:
                 "INFO": "green",
                 "WARNING": "yellow",
                 "ERROR": "red",
-                "CRITICAL": "red,bg_white",
+                "CRITICAL": "magenta",
             },
         )
     )

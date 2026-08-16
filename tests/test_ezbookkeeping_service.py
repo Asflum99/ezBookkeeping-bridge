@@ -84,7 +84,7 @@ class TestRegisterTransaction:
         assert result is True
 
     @respx.mock
-    async def test_api_returns_non_200(self):
+    async def test_api_returns_non_200(self, _mock_ezbookkeeping_url):
         respx.post("http://test/api/v1/transactions/add.json").mock(
             return_value=httpx.Response(400, json={"success": False})
         )
@@ -96,7 +96,7 @@ class TestRegisterTransaction:
         assert result is False
 
     @respx.mock
-    async def test_api_returns_200_but_not_success(self):
+    async def test_api_returns_200_but_not_success(self, _mock_ezbookkeeping_url):
         respx.post("http://test/api/v1/transactions/add.json").mock(
             return_value=httpx.Response(200, json={"success": False})
         )
@@ -124,18 +124,6 @@ class TestRegisterTransaction:
         respx.post("http://test/api/v1/transactions/add.json").mock(
             side_effect=httpx.ConnectError("Connection refused")
         )
-
-        result = await register_transaction(
-            self.VALID_SANITIZED_DATA, self.VALID_USER_INFO
-        )
-
-        assert result is False
-
-    async def test_unexpected_exception_returns_false(self, mocker):
-        mock_client = mocker.AsyncMock()
-        mock_client.__aenter__.return_value = mock_client
-        mock_client.post.side_effect = AttributeError("unexpected")
-        mocker.patch("httpx.AsyncClient", return_value=mock_client)
 
         result = await register_transaction(
             self.VALID_SANITIZED_DATA, self.VALID_USER_INFO
