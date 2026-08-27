@@ -142,18 +142,18 @@ async def _fetch_ez_list(
 
 
 def _flatten_categories(raw: dict) -> list[dict]:
-    """Extract expense (type 2) and transfer (type 3) categories, flatten hierarchy."""
+    """Flatten all category types and preserve hierarchy and type."""
     result = []
 
-    def flatten(cats, parent_name=""):
+    def flatten(cats, category_type, parent_name=""):
         for cat in cats:
             name = f"{parent_name} > {cat['name']}" if parent_name else cat["name"]
-            result.append({"id": cat["id"], "name": name})
+            result.append({"id": cat["id"], "name": name, "type": int(category_type)})
             if cat.get("subCategories"):
-                flatten(cat["subCategories"], name)
+                flatten(cat["subCategories"], category_type, name)
 
-    for category_type in ("2", "3"):
-        flatten(raw.get(category_type, []))
+    for category_type, categories in raw.items():
+        flatten(categories, category_type)
     return result
 
 

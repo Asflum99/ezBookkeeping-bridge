@@ -299,8 +299,9 @@ class TestGetUserCategories:
         )
         result = await get_user_categories("fake-token")
         assert result == [
-            {"id": "exp-1", "name": "Food"},
-            {"id": "exp-2", "name": "Transport"},
+            {"id": "inc-1", "name": "Salary", "type": 1},
+            {"id": "exp-1", "name": "Food", "type": 2},
+            {"id": "exp-2", "name": "Transport", "type": 2},
         ]
 
     @respx.mock
@@ -327,9 +328,9 @@ class TestGetUserCategories:
         )
         result = await get_user_categories("fake-token")
         assert result == [
-            {"id": "exp-1", "name": "Food"},
-            {"id": "sub-1", "name": "Food > Groceries"},
-            {"id": "sub-2", "name": "Food > Restaurants"},
+            {"id": "exp-1", "name": "Food", "type": 2},
+            {"id": "sub-1", "name": "Food > Groceries", "type": 2},
+            {"id": "sub-2", "name": "Food > Restaurants", "type": 2},
         ]
 
     @respx.mock
