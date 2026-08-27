@@ -69,6 +69,7 @@ class UserRepository:
         label: str,
         extra_insert_cols: dict[str, str] | None = None,
         item_extract_fn: Callable[[dict], dict] | None = None,
+        item_update_fn: Callable[[dict], dict] | None = None,
     ) -> dict:
         """Generic sync: local SQLite table ↔ remote ezBookkeeping items."""
         logger.info(f"Syncing {label.lower()}s for user {telegram_id}")
@@ -77,7 +78,8 @@ class UserRepository:
         logger.debug(f"Remote ids: {remote_ids}")
 
         with get_db(self._db_path) as conn:
-            select_extra = ", category" if item_extract_fn else ""
+            extra_keys = item_extract_fn(remote_items[0]).keys() if remote_items else []
+            select_extra = f", {', '.join(extra_keys)}" if extra_keys else ""
             local_rows = conn.execute(
                 f"SELECT name, {id_column}{select_extra} FROM {table} WHERE user_id = ?",
                 (telegram_id,),
@@ -128,7 +130,11 @@ class UserRepository:
                 if local_name != remote_name:
                     sets["name"] = remote_name
 
-                if item_extract_fn:
+                if item_update_fn:
+                    for key, remote_val in item_update_fn(remote_item).items():
+                        if remote_val != local_by_id[ez_id].get(key):
+                            sets[key] = remote_val
+                elif item_extract_fn:
                     extra = item_extract_fn(remote_item)
                     local_val = local_by_id[ez_id].get("category")
                     remote_val = extra.get("category")
@@ -182,4 +188,6 @@ class UserRepository:
             "ez_category_id",
             remote_categories,
             "Category",
+            item_extract_fn=lambda item: {"category_type": item["type"]},
+            item_update_fn=lambda item: {"category_type": item["type"]},
         )

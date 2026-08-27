@@ -2,7 +2,7 @@ import sqlite3
 
 import pytest
 
-from database import MIGRATIONS, SCHEMA, get_db
+from database import MIGRATIONS, SCHEMA, get_db, init_db
 from repositories.user_repository import UserRepository
 
 
@@ -158,7 +158,6 @@ class TestSyncAccounts:
         assert result["removed"] == []
         assert result["updated"] == []
 
-
 class TestSyncCategories:
     def _seed_user(self, conn, telegram_id):
         conn.execute(
@@ -172,8 +171,8 @@ class TestSyncCategories:
 
         repo = UserRepository(db_path=db)
         remote = [
-            {"id": "cat-1", "name": "Food"},
-            {"id": "cat-2", "name": "Transport"},
+            {"id": "cat-1", "name": "Food", "type": 2},
+            {"id": "cat-2", "name": "Transport", "type": 1},
         ]
 
         result = repo.sync_categories(12345, remote)
@@ -181,6 +180,11 @@ class TestSyncCategories:
         assert len(result["added"]) == 2
         assert len(result["removed"]) == 0
         assert len(result["updated"]) == 0
+        with get_db(db) as conn:
+            assert conn.execute(
+                "SELECT category_type FROM user_categories WHERE ez_category_id = ?",
+                ("cat-2",),
+            ).fetchone()[0] == 1
 
     def test_removes_deleted_categories(self, db):
         with get_db(db) as conn:
@@ -191,7 +195,7 @@ class TestSyncCategories:
             )
 
         repo = UserRepository(db_path=db)
-        remote = [{"id": "cat-new", "name": "Transport"}]
+        remote = [{"id": "cat-new", "name": "Transport", "type": 2}]
 
         result = repo.sync_categories(12345, remote)
 
@@ -210,7 +214,7 @@ class TestSyncCategories:
             )
 
         repo = UserRepository(db_path=db)
-        remote = [{"id": "cat-1", "name": "Food > Groceries"}]
+        remote = [{"id": "cat-1", "name": "Food > Groceries", "type": 1}]
 
         result = repo.sync_categories(12345, remote)
 
@@ -222,6 +226,11 @@ class TestSyncCategories:
             "old_name": "Food",
             "new_name": "Food > Groceries",
         }
+        with get_db(db) as conn:
+            assert conn.execute(
+                "SELECT category_type FROM user_categories WHERE ez_category_id = ?",
+                ("cat-1",),
+            ).fetchone()[0] == 1
 
     def test_no_changes(self, db):
         with get_db(db) as conn:
@@ -232,10 +241,64 @@ class TestSyncCategories:
             )
 
         repo = UserRepository(db_path=db)
-        remote = [{"id": "cat-1", "name": "Food"}]
+        remote = [{"id": "cat-1", "name": "Food", "type": 2}]
 
         result = repo.sync_categories(12345, remote)
 
         assert result["added"] == []
         assert result["removed"] == []
         assert result["updated"] == []
+
+    def test_allows_same_name_for_different_category_ids(self, db):
+        with get_db(db) as conn:
+            self._seed_user(conn, 12345)
+
+        repo = UserRepository(db_path=db)
+        result = repo.sync_categories(
+            12345,
+            [
+                {"id": "inc-1", "name": "Salary", "type": 1},
+                {"id": "exp-1", "name": "Salary", "type": 2},
+            ],
+        )
+
+        assert len(result["added"]) == 2
+
+    def test_migrates_existing_categories(self, tmp_path):
+        db = tmp_path / "legacy.db"
+        conn = sqlite3.connect(db)
+        conn.executescript(
+            """
+            CREATE TABLE users (
+                telegram_id INTEGER PRIMARY KEY,
+                nombre TEXT NOT NULL,
+                ez_token TEXT NOT NULL
+            );
+            CREATE TABLE user_categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                ez_category_id TEXT NOT NULL,
+                UNIQUE(user_id, name)
+            );
+            INSERT INTO users VALUES (12345, 'Test', 'tok');
+            INSERT INTO user_categories (user_id, name, ez_category_id)
+            VALUES (12345, 'Food', 'cat-1');
+            PRAGMA user_version = 2;
+            """
+        )
+        conn.commit()
+        conn.close()
+
+        init_db(db)
+
+        with get_db(db) as conn:
+            row = conn.execute(
+                "SELECT category_type FROM user_categories WHERE ez_category_id = ?",
+                ("cat-1",),
+            ).fetchone()
+            assert row[0] == 2
+            conn.execute(
+                "INSERT INTO user_categories (user_id, name, ez_category_id) VALUES (?, ?, ?)",
+                (12345, "Food", "cat-2"),
+            )

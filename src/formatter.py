@@ -23,9 +23,9 @@ def get_transfer_category_id(
 ) -> str | None:
     """Returns transfer category ID based on destination account type."""
     if destination_account_category == 3:
-        return user_categories.get("Pago de Tarjetas de Crédito")
+        return user_categories.get("Traslado General > Pago de Tarjetas de Crédito")
     else:
-        return user_categories.get("Transferencia Bancaria")
+        return user_categories.get("Traslado General > Transferencia Bancaria")
 
 
 def validate_and_sanitize_voucher_data(

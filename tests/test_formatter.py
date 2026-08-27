@@ -337,22 +337,22 @@ class TestGetTransferCategoryId:
 
     def test_credit_card_destination(self):
         categories = {
-            "Transferencia Bancaria": "123",
-            "Pago de Tarjetas de Crédito": "456",
+            "Traslado General > Transferencia Bancaria": "123",
+            "Traslado General > Pago de Tarjetas de Crédito": "456",
         }
         result = get_transfer_category_id(3, categories)
         assert result == "456"
 
     def test_other_destination(self):
         categories = {
-            "Transferencia Bancaria": "123",
-            "Pago de Tarjetas de Crédito": "456",
+            "Traslado General > Transferencia Bancaria": "123",
+            "Traslado General > Pago de Tarjetas de Crédito": "456",
         }
         result = get_transfer_category_id(2, categories)
         assert result == "123"
 
     def test_default_category(self):
-        categories = {"Transferencia Bancaria": "123"}
+        categories = {"Traslado General > Transferencia Bancaria": "123"}
         result = get_transfer_category_id(0, categories)
         assert result == "123"
 
