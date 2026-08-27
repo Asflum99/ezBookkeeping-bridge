@@ -24,13 +24,31 @@ CREATE TABLE IF NOT EXISTS user_categories (
     user_id INTEGER NOT NULL REFERENCES users(telegram_id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     ez_category_id TEXT NOT NULL,
-    UNIQUE(user_id, name)
+    category_type INTEGER NOT NULL DEFAULT 2,
+    UNIQUE(user_id, ez_category_id)
 );
 """
 
 MIGRATIONS = [
     (1, "ALTER TABLE user_accounts ADD COLUMN hints TEXT NOT NULL DEFAULT ''"),
     (2, "ALTER TABLE user_accounts ADD COLUMN category INTEGER NOT NULL DEFAULT 0"),
+    (
+        3,
+        """
+        CREATE TABLE user_categories_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(telegram_id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            ez_category_id TEXT NOT NULL,
+            category_type INTEGER NOT NULL DEFAULT 2,
+            UNIQUE(user_id, ez_category_id)
+        );
+        INSERT INTO user_categories_new (user_id, name, ez_category_id)
+        SELECT user_id, name, ez_category_id FROM user_categories;
+        DROP TABLE user_categories;
+        ALTER TABLE user_categories_new RENAME TO user_categories;
+        """,
+    ),
 ]
 
 
