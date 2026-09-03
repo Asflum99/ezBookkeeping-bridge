@@ -13,12 +13,13 @@ from config import logger, settings
 
 
 def build_system_prompt(
-    user_categories: list[str], user_accounts: list[tuple[str, str]]
+    user_categories: list[str], user_accounts: list[tuple[str, str, int]]
 ) -> str:
-    """Format the cached prompt template with user categories."""
+    """Format the cached prompt template with user categories and account types."""
     formatted_categories = "\n".join(f"- {cat}" for cat in user_categories)
     formatted_accounts = "\n".join(
-        f'- "{name}": Matches {hints}' for name, hints in user_accounts
+        f'- "{name}": Matches {hints}'
+        for name, hints, _ in user_accounts
     )
     logger.debug(f"Rendered accounts in prompt:\n{formatted_accounts}")
     return settings.system_prompt_template.format(
@@ -94,7 +95,7 @@ def _build_messages(base64_image: str, system_prompt: str) -> list:
 def process_expense_with_ai(
     local_photo_path: str,
     user_categories: list[str],
-    user_accounts: list[tuple[str, str]],
+    user_accounts: list[tuple[str, str, int]],
 ) -> dict[str, Any]:
     """
     Encodes the local voucher image to base64, sends it to the LLM via LangChain

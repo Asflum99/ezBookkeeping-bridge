@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [tool.ty.environment]
-root = ["./src"]
+root = ["./src", "./tests"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

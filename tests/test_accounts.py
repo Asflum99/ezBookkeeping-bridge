@@ -14,7 +14,7 @@ def _build_client(user_repo_mock):
 
 
 class TestUpdateAccounts:
-    @pytest.mark.parametrize("mock_send", ["accounts"], indirect=True)
+    @pytest.mark.parametrize("mock_send", ["sync"], indirect=True)
     def test_api_failure(self, mocker, mock_send):
         user_repo = mocker.MagicMock()
         user_repo.get_user.return_value = VALID_USER_INFO
@@ -25,10 +25,10 @@ class TestUpdateAccounts:
         assert resp.status_code == 200
         assert "Error" in mock_send.call_args[0][2]
 
-    @pytest.mark.parametrize("mock_send", ["accounts"], indirect=True)
+    @pytest.mark.parametrize("mock_send", ["sync"], indirect=True)
     def test_happy_path(self, mocker, mock_send):
         mocker.patch(
-            "routers.telegram.accounts.get_user_accounts",
+            "routers.telegram.sync.get_user_accounts",
             return_value=[{"id": "acc-1", "name": "BCP"}],
         )
         user_repo = mocker.MagicMock()

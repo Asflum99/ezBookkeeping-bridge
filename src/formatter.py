@@ -4,7 +4,36 @@ from typing import Any, cast
 from config import logger, settings
 
 
-def validate_and_sanitize_voucher_data(raw_llm_data: dict[str, Any]) -> dict[str, Any]:
+def resolve_transaction_type(
+    types: list[int],
+    destination_account: str | None,
+    user_accounts_hints: list[tuple[str, str, int]],
+) -> int:
+    """Returns 4 if destination_account matches a user account hint, else 3."""
+    if 4 in types and destination_account:
+        for _, hints, _ in user_accounts_hints:
+            if destination_account in hints:
+                return 4
+    return 3
+
+
+def get_transfer_category_id(
+    destination_account_category: int,
+    user_categories: dict[str, str],
+) -> str | None:
+    """Returns transfer category ID based on destination account type."""
+    if destination_account_category == 3:
+        return user_categories.get("Traslado General > Pago de Tarjetas de Crédito")
+    else:
+        return user_categories.get("Traslado General > Transferencia Bancaria")
+
+
+def validate_and_sanitize_voucher_data(
+    raw_llm_data: dict[str, Any],
+    user_info: dict[str, Any],
+    user_accounts_hints: list[tuple[str, str, int]],
+    user_categories: dict[str, str],
+) -> dict[str, Any]:
     """
     Validates LLM response data. Raises ValueError if required fields are missing.
     Falls back to current time for invalid/missing date_time.
@@ -23,10 +52,37 @@ def validate_and_sanitize_voucher_data(raw_llm_data: dict[str, Any]) -> dict[str
         logger.error("Payment method is missing from LLM extraction.")
         raise ValueError("Payment method is required but not provided.")
 
-    category = sanitized_data.get("category")
-    if not category:
-        logger.error("Category is missing from LLM extraction.")
-        raise ValueError("Category is required but not provided.")
+    # Resolve transaction type
+    types = sanitized_data.get("types", [3])
+    destination_account = sanitized_data.get("destination_account")
+    transaction_type = resolve_transaction_type(
+        types, destination_account, user_accounts_hints
+    )
+    sanitized_data["transaction_type"] = transaction_type
+
+    # Handle category based on transaction type
+    if transaction_type == 4:
+        # Type 4: Transfer — no category from LLM, resolve from destination account
+        sanitized_data["category"] = None
+        dest_account_id = None
+        dest_account_category = 0
+        for account_name, hints, category in user_accounts_hints:
+            if cast(str, destination_account) in hints:
+                dest_account_id = user_info.get("cuentas", {}).get(account_name)
+                dest_account_category = category
+                break
+        sanitized_data["destination_account_id"] = dest_account_id
+        sanitized_data["category_id"] = get_transfer_category_id(
+            dest_account_category, user_categories
+        )
+    else:
+        # Type 3: Expense — require category from LLM
+        category = sanitized_data.get("category")
+        if not category:
+            logger.error("Category is missing from LLM extraction.")
+            raise ValueError("Category is required but not provided.")
+        sanitized_data["category_id"] = user_categories.get(category)
+        sanitized_data["destination_account_id"] = None
 
     if not sanitized_data.get("comment"):
         sanitized_data["comment"] = ""
@@ -90,14 +146,25 @@ def prepare_confirmation_message(sanitized_data: dict[str, Any]) -> str:
 
     payment_account = sanitized_data.get("payment_account", "❓ Desconocido")
 
-    category_name = sanitized_data.get("category", "❓ Desconocida")
+    transaction_type = sanitized_data.get("transaction_type", 3)
+
+    if transaction_type == 4:
+        dest_category = sanitized_data.get("destination_account_category", 0)
+        if dest_category == 3:  # Credit Card
+            header = "✅ ¡Tarjeta de crédito pagada con éxito!"
+        else:
+            header = "✅ ¡Transferencia registrada con éxito!"
+        category_line = ""
+    else:
+        header = "✅ ¡Gasto registrado con éxito!"
+        category_name = sanitized_data.get("category", "❓ Desconocida")
+        category_line = f"\n🏷️ Categoría: {category_name}"
 
     message = (
-        f"✅ ¡Gasto registrado con éxito!\n\n"
+        f"{header}\n\n"
         f"💰 Monto: S/. {amount}\n"
         f"📝 Descripción: {comment}\n"
         f"📅 Fecha: {formatted_date}\n"
-        f"💳 Cuenta de pago: {payment_account}\n"
-        f"🏷️ Categoría: {category_name}"
+        f"💳 Cuenta de pago: {payment_account}{category_line}"
     )
     return message

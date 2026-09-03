@@ -5,9 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from config import logger, settings
 from repositories.user_repository import UserRepository
-from routers.telegram.accounts import handle_update_accounts
-from routers.telegram.categories import handle_update_categories
 from routers.telegram.photo import handle_photo
+from routers.telegram.sync import handle_update_accounts, handle_update_categories
 from routers.telegram.utils import send_telegram_message
 from schemas import TelegramUpdate
 

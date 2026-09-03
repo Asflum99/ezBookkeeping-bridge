@@ -1,6 +1,6 @@
 import sqlite3
 
-from database import init_db
+from database import MIGRATIONS, init_db
 
 
 class TestInitDb:
@@ -19,16 +19,17 @@ class TestInitDb:
         }
         assert {"users", "user_accounts", "user_categories"} <= tables
 
-        # hints column present
+        # hints and category columns present
         columns = {
             r[1]
             for r in conn.execute("PRAGMA table_info(user_accounts)").fetchall()
         }
         assert "hints" in columns
+        assert "category" in columns
 
-        # user_version set to 1
+        # user_version matches migration count
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        assert version == 1
+        assert version == len(MIGRATIONS)
 
         conn.close()
 
@@ -43,7 +44,7 @@ class TestInitDb:
 
         conn = sqlite3.connect(str(db_path))
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        assert version == 1
+        assert version == len(MIGRATIONS)
         conn.close()
 
     def test_idempotent(self, tmp_path):

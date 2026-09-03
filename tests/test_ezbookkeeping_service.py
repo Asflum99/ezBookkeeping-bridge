@@ -10,6 +10,29 @@ from services.ezbookkeeping_service import (
     register_transaction,
 )
 
+TRANSFER_SANITIZED_DATA = {
+    "amount": 100.00,
+    "date_time": "2026-07-19 12:30:00",
+    "payment_account": "billetera_digital",
+    "category": None,
+    "comment": "Pago tarjeta",
+    "transaction_type": 4,
+    "category_id": "3826101146502561822",
+    "destination_account_id": "3826102909318201345",
+}
+
+TRANSFER_USER_INFO = {
+    "ez_token": "fake-jwt-token",
+    "cuentas": {
+        "billetera_digital": "3826102909318201344",
+        "tarjeta_ripley": "3826102909318201345",
+    },
+    "categorias": {
+        "Transferencia Bancaria": "3826101146502561821",
+        "Pago de Tarjetas de Crédito": "3826101146502561822",
+    },
+}
+
 
 class TestRegisterTransaction:
     VALID_SANITIZED_DATA: ClassVar = {
@@ -18,6 +41,9 @@ class TestRegisterTransaction:
         "payment_account": "billetera_digital",
         "category": "Comida",
         "comment": "Tambo",
+        "transaction_type": 3,
+        "category_id": "3826101146502561820",
+        "destination_account_id": None,
     }
 
     VALID_USER_INFO: ClassVar = {
@@ -30,21 +56,35 @@ class TestRegisterTransaction:
         "sanitized_data, user_info",
         [
             (
-                {"payment_account": "billetera_digital"},
                 {
+                    "amount": 10,
+                    "date_time": "2026-07-19 12:00:00",
+                    "payment_account": "billetera_digital",
+                    "transaction_type": 3,
+                },
+                {
+                    "ez_token": "fake-token",
                     "categorias": {"Comida": "123"},
                     "cuentas": {"billetera_digital": "321"},
                 },
             ),
             (
-                {"category": "Ropa", "payment_account": "billetera_digital"},
                 {
+                    "amount": 10,
+                    "date_time": "2026-07-19 12:00:00",
+                    "category": "Ropa",
+                    "payment_account": "billetera_digital",
+                    "transaction_type": 3,
+                    "category_id": "999",
+                },
+                {
+                    "ez_token": "fake-token",
                     "categorias": {"Comida": "123"},
                     "cuentas": {"billetera_digital": "321"},
                 },
             ),
         ],
-        ids=["missing_category", "category_not_in_user_categories"],
+        ids=["missing_category_id", "category_id_not_in_user_categories"],
     )
     async def test_category_lookup_fails(self, sanitized_data, user_info):
         result = await register_transaction(sanitized_data, user_info)
@@ -54,12 +94,26 @@ class TestRegisterTransaction:
         "sanitized_data, user_info",
         [
             (
-                {"category": "Comida"},
-                {"categorias": {"Comida": "123"}},
+                {
+                    "amount": 10,
+                    "date_time": "2026-07-19 12:00:00",
+                    "category": "Comida",
+                    "transaction_type": 3,
+                    "category_id": "123",
+                },
+                {"ez_token": "fake-token", "categorias": {"Comida": "123"}},
             ),
             (
-                {"category": "Comida", "payment_account": "efectivo"},
                 {
+                    "amount": 10,
+                    "date_time": "2026-07-19 12:00:00",
+                    "category": "Comida",
+                    "payment_account": "efectivo",
+                    "transaction_type": 3,
+                    "category_id": "123",
+                },
+                {
+                    "ez_token": "fake-token",
                     "categorias": {"Comida": "123"},
                     "cuentas": {"billetera_digital": "321"},
                 },
@@ -84,7 +138,7 @@ class TestRegisterTransaction:
         assert result is True
 
     @respx.mock
-    async def test_api_returns_non_200(self):
+    async def test_api_returns_non_200(self, _mock_ezbookkeeping_url):
         respx.post("http://test/api/v1/transactions/add.json").mock(
             return_value=httpx.Response(400, json={"success": False})
         )
@@ -96,7 +150,7 @@ class TestRegisterTransaction:
         assert result is False
 
     @respx.mock
-    async def test_api_returns_200_but_not_success(self):
+    async def test_api_returns_200_but_not_success(self, _mock_ezbookkeeping_url):
         respx.post("http://test/api/v1/transactions/add.json").mock(
             return_value=httpx.Response(200, json={"success": False})
         )
@@ -131,16 +185,50 @@ class TestRegisterTransaction:
 
         assert result is False
 
-    async def test_unexpected_exception_returns_false(self, mocker):
-        mock_client = mocker.AsyncMock()
-        mock_client.__aenter__.return_value = mock_client
-        mock_client.post.side_effect = AttributeError("unexpected")
-        mocker.patch("httpx.AsyncClient", return_value=mock_client)
-
-        result = await register_transaction(
-            self.VALID_SANITIZED_DATA, self.VALID_USER_INFO
+    @respx.mock
+    async def test_type_4_transfer_success(self, _mock_ezbookkeeping_url):
+        respx.post("http://test/api/v1/transactions/add.json").mock(
+            return_value=httpx.Response(200, json={"success": True})
         )
 
+        result = await register_transaction(TRANSFER_SANITIZED_DATA, TRANSFER_USER_INFO)
+
+        assert result is True
+
+    @respx.mock
+    async def test_type_4_transfer_includes_destination_fields(
+        self, _mock_ezbookkeeping_url
+    ):
+        mock = respx.post("http://test/api/v1/transactions/add.json").mock(
+            return_value=httpx.Response(200, json={"success": True})
+        )
+
+        await register_transaction(TRANSFER_SANITIZED_DATA, TRANSFER_USER_INFO)
+
+        body = mock.calls[0].request.content
+        import json
+
+        payload = json.loads(body)
+        assert payload["type"] == 4
+        assert payload["destinationAccountId"] == "3826102909318201345"
+        assert payload["destinationAmount"] == 10000
+
+    async def test_type_4_missing_destination_fails(self):
+        data = {
+            "amount": 100,
+            "date_time": "2026-07-19 12:00:00",
+            "payment_account": "billetera_digital",
+            "transaction_type": 4,
+            "category_id": "123",
+            "destination_account_id": None,
+        }
+        user_info = {
+            "ez_token": "fake-token",
+            "cuentas": {"billetera_digital": "321"},
+            "categorias": {},
+        }
+
+        result = await register_transaction(data, user_info)
         assert result is False
 
 
@@ -211,8 +299,9 @@ class TestGetUserCategories:
         )
         result = await get_user_categories("fake-token")
         assert result == [
-            {"id": "exp-1", "name": "Food"},
-            {"id": "exp-2", "name": "Transport"},
+            {"id": "inc-1", "name": "Salary", "type": 1},
+            {"id": "exp-1", "name": "Food", "type": 2},
+            {"id": "exp-2", "name": "Transport", "type": 2},
         ]
 
     @respx.mock
@@ -239,9 +328,9 @@ class TestGetUserCategories:
         )
         result = await get_user_categories("fake-token")
         assert result == [
-            {"id": "exp-1", "name": "Food"},
-            {"id": "sub-1", "name": "Food > Groceries"},
-            {"id": "sub-2", "name": "Food > Restaurants"},
+            {"id": "exp-1", "name": "Food", "type": 2},
+            {"id": "sub-1", "name": "Food > Groceries", "type": 2},
+            {"id": "sub-2", "name": "Food > Restaurants", "type": 2},
         ]
 
     @respx.mock

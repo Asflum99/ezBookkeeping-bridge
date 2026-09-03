@@ -14,7 +14,7 @@ def _build_client(user_repo_mock):
 
 
 class TestUpdateCategories:
-    @pytest.mark.parametrize("mock_send", ["categories"], indirect=True)
+    @pytest.mark.parametrize("mock_send", ["sync"], indirect=True)
     def test_api_failure(self, mocker, mock_send):
         user_repo = mocker.MagicMock()
         user_repo.get_user.return_value = VALID_USER_INFO
@@ -31,10 +31,10 @@ class TestUpdateCategories:
         assert resp.status_code == 200
         assert "Error" in mock_send.call_args[0][2]
 
-    @pytest.mark.parametrize("mock_send", ["categories"], indirect=True)
+    @pytest.mark.parametrize("mock_send", ["sync"], indirect=True)
     def test_happy_path(self, mocker, mock_send):
         mocker.patch(
-            "routers.telegram.categories.get_user_categories",
+            "routers.telegram.sync.get_user_categories",
             return_value=[{"id": "cat-1", "name": "Food"}],
         )
         user_repo = mocker.MagicMock()

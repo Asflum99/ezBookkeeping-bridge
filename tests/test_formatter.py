@@ -1,30 +1,54 @@
 from datetime import datetime, timedelta
+from typing import cast
 
 import pytest
+from helpers import VALID_USER_INFO
 
 from config import settings
 from formatter import (
+    get_transfer_category_id,
     prepare_confirmation_message,
+    resolve_transaction_type,
     validate_and_sanitize_voucher_data,
 )
+
+VALID_HINTS = cast(
+    list[tuple[str, str, int]],
+    VALID_USER_INFO["cuentas_hints"],
+)
+VALID_CATEGORIES = cast(dict[str, str], VALID_USER_INFO["categorias"])
 
 
 class TestValidateAndSanitizeVoucherData:
     """Unit tests for validating and sanitizing LLM extracted voucher data."""
 
     def test_valid_data_passes_through(self):
-        now_str = datetime.now(settings.timezone).strftime("%Y-%m-%d %H:%M:%S")
+        yesterday_str = (datetime.now(settings.timezone) - timedelta(days=1)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
         data = {
             "amount": 25,
-            "date_time": now_str,
+            "date_time": yesterday_str,
             "payment_account": "billetera_digital",
             "category": "Comida",
         }
 
-        result = validate_and_sanitize_voucher_data(data)
+        user_info = {
+            "nombre": "Test User",
+            "ez_token": "fake-jwt-token",
+            "cuentas": {"BCP": "3826102909318201344"},
+        }
+
+        user_accounts_hints = [("BCP", "Yape, BCP Transfer, morado", 2)]
+
+        user_categories = {"Comida": "3826101146502561820"}
+
+        result = validate_and_sanitize_voucher_data(
+            data, user_info, user_accounts_hints, user_categories
+        )
 
         assert result["amount"] == 25
-        assert result["date_time"] == now_str
+        assert result["date_time"] == yesterday_str
 
     @pytest.mark.parametrize(
         "invalid_payload",
@@ -59,17 +83,31 @@ class TestValidateAndSanitizeVoucherData:
     def test_invalid_amount_raises_value_error(self, invalid_payload):
         """Verify that missing, zero, or None amounts raise a ValueError."""
         with pytest.raises(ValueError):
-            validate_and_sanitize_voucher_data(invalid_payload)
+            validate_and_sanitize_voucher_data(
+                invalid_payload, VALID_USER_INFO, VALID_HINTS, VALID_CATEGORIES
+            )
 
     def test_missing_date_falls_back(self):
         data = {
-            "date_time": None,
-            "amount": 10,
+            "amount": 25,
+            "date_time": "",
             "payment_account": "billetera_digital",
             "category": "Comida",
         }
 
-        result = validate_and_sanitize_voucher_data(data)
+        user_info = {
+            "nombre": "Test User",
+            "ez_token": "fake-jwt-token",
+            "cuentas": {"BCP": "3826102909318201344"},
+        }
+
+        user_accounts_hints = [("BCP", "Yape, BCP Transfer, morado", 2)]
+
+        user_categories = {"Comida": "3826101146502561820"}
+
+        result = validate_and_sanitize_voucher_data(
+            data, user_info, user_accounts_hints, user_categories
+        )
 
         assert "date_time" in result
         assert datetime.strptime(result["date_time"], "%Y-%m-%d %H:%M:%S").replace(
@@ -87,7 +125,19 @@ class TestValidateAndSanitizeVoucherData:
             "category": "Comida",
         }
 
-        result = validate_and_sanitize_voucher_data(data)
+        user_info = {
+            "nombre": "Test User",
+            "ez_token": "fake-jwt-token",
+            "cuentas": {"BCP": "3826102909318201344"},
+        }
+
+        user_accounts_hints = [("BCP", "Yape, BCP Transfer, morado", 2)]
+
+        user_categories = {"Comida": "3826101146502561820"}
+
+        result = validate_and_sanitize_voucher_data(
+            data, user_info, user_accounts_hints, user_categories
+        )
 
         assert result["date_time"] != old_date
 
@@ -102,7 +152,19 @@ class TestValidateAndSanitizeVoucherData:
             "category": "Comida",
         }
 
-        result = validate_and_sanitize_voucher_data(data)
+        user_info = {
+            "nombre": "Test User",
+            "ez_token": "fake-jwt-token",
+            "cuentas": {"BCP": "3826102909318201344"},
+        }
+
+        user_accounts_hints = [("BCP", "Yape, BCP Transfer, morado", 2)]
+
+        user_categories = {"Comida": "3826101146502561820"}
+
+        result = validate_and_sanitize_voucher_data(
+            data, user_info, user_accounts_hints, user_categories
+        )
 
         assert result["date_time"] != future_date
 
@@ -120,7 +182,9 @@ class TestValidateAndSanitizeVoucherData:
             "category": "Comida",
         }
 
-        result = validate_and_sanitize_voucher_data(data)
+        result = validate_and_sanitize_voucher_data(
+            data, VALID_USER_INFO, VALID_HINTS, VALID_CATEGORIES
+        )
 
         assert datetime.strptime(result["date_time"], "%Y-%m-%d %H:%M:%S").replace(
             tzinfo=settings.timezone
@@ -135,7 +199,19 @@ class TestValidateAndSanitizeVoucherData:
             "category": "Comida",
         }
 
-        validate_and_sanitize_voucher_data(original)
+        user_info = {
+            "nombre": "Test User",
+            "ez_token": "fake-jwt-token",
+            "cuentas": {"BCP": "3826102909318201344"},
+        }
+
+        user_accounts_hints = [("BCP", "Yape, BCP Transfer, morado", 2)]
+
+        user_categories = {"Comida": "3826101146502561820"}
+
+        validate_and_sanitize_voucher_data(
+            original, user_info, user_accounts_hints, user_categories
+        )
 
         assert original["date_time"] == "invalid"
         assert "comment" not in original
@@ -155,7 +231,9 @@ class TestValidateAndSanitizeVoucherData:
         }
 
         with pytest.raises(ValueError, match="Payment method is required"):
-            validate_and_sanitize_voucher_data(data)
+            validate_and_sanitize_voucher_data(
+                data, VALID_USER_INFO, VALID_HINTS, VALID_CATEGORIES
+            )
 
     @pytest.mark.parametrize(
         "invalid_category",
@@ -172,7 +250,9 @@ class TestValidateAndSanitizeVoucherData:
         }
 
         with pytest.raises(ValueError, match="Category is required"):
-            validate_and_sanitize_voucher_data(data)
+            validate_and_sanitize_voucher_data(
+                data, VALID_USER_INFO, VALID_HINTS, VALID_CATEGORIES
+            )
 
     def test_missing_comment_defaults_to_empty_string(self):
         """Verify that missing comment defaults to empty string."""
@@ -184,7 +264,19 @@ class TestValidateAndSanitizeVoucherData:
             "category": "Comida",
         }
 
-        result = validate_and_sanitize_voucher_data(data)
+        user_info = {
+            "nombre": "Test User",
+            "ez_token": "fake-jwt-token",
+            "cuentas": {"BCP": "3826102909318201344"},
+        }
+
+        user_accounts_hints = [("BCP", "Yape, BCP Transfer, morado", 2)]
+
+        user_categories = {"Comida": "3826101146502561820"}
+
+        result = validate_and_sanitize_voucher_data(
+            data, user_info, user_accounts_hints, user_categories
+        )
 
         assert result["comment"] == ""
 
@@ -214,3 +306,89 @@ class TestPrepareConfirmationMessage:
         data = {"amount": 10, "payment_account": "efectivo"}
         msg = prepare_confirmation_message(data)
         assert "efectivo" in msg
+
+
+class TestResolveTransactionType:
+    """Tests for resolve_transaction_type function."""
+
+    def test_type_4_with_hint_match(self):
+        hints = [("tarjeta_ripley", "Ripley, 4821, tarjeta", 3)]
+        result = resolve_transaction_type([3, 4], "4821", hints)
+        assert result == 4
+
+    def test_type_4_no_hint_match(self):
+        hints = [("tarjeta_ripley", "Ripley, 4821, tarjeta", 3)]
+        result = resolve_transaction_type([3, 4], "9999", hints)
+        assert result == 3
+
+    def test_type_4_no_destination_account(self):
+        hints = [("tarjeta_ripley", "Ripley, 4821, tarjeta", 3)]
+        result = resolve_transaction_type([3, 4], None, hints)
+        assert result == 3
+
+    def test_type_3_only(self):
+        hints = [("tarjeta_ripley", "Ripley, 4821, tarjeta", 3)]
+        result = resolve_transaction_type([3], "4821", hints)
+        assert result == 3
+
+
+class TestGetTransferCategoryId:
+    """Tests for get_transfer_category_id function."""
+
+    def test_credit_card_destination(self):
+        categories = {
+            "Traslado General > Transferencia Bancaria": "123",
+            "Traslado General > Pago de Tarjetas de Crédito": "456",
+        }
+        result = get_transfer_category_id(3, categories)
+        assert result == "456"
+
+    def test_other_destination(self):
+        categories = {
+            "Traslado General > Transferencia Bancaria": "123",
+            "Traslado General > Pago de Tarjetas de Crédito": "456",
+        }
+        result = get_transfer_category_id(2, categories)
+        assert result == "123"
+
+    def test_default_category(self):
+        categories = {"Traslado General > Transferencia Bancaria": "123"}
+        result = get_transfer_category_id(0, categories)
+        assert result == "123"
+
+
+class TestValidateType4Transfer:
+    """Tests for type 4 transfer validation."""
+
+    def test_type_4_skips_category_requirement(self):
+        now_str = datetime.now(settings.timezone).strftime("%Y-%m-%d %H:%M:%S")
+        data = {
+            "amount": 100,
+            "date_time": now_str,
+            "payment_account": "billetera_digital",
+            "types": [3, 4],
+            "destination_account": "4821",
+        }
+
+        result = validate_and_sanitize_voucher_data(
+            data, VALID_USER_INFO, VALID_HINTS, VALID_CATEGORIES
+        )
+
+        assert result["transaction_type"] == 4
+        assert result["category"] is None
+        assert result["destination_account_id"] == "3826102909318201345"
+        assert result["category_id"] == None
+
+    def test_type_3_requires_category(self):
+        now_str = datetime.now(settings.timezone).strftime("%Y-%m-%d %H:%M:%S")
+        data = {
+            "amount": 100,
+            "date_time": now_str,
+            "payment_account": "billetera_digital",
+            "types": [3],
+        }
+
+        with pytest.raises(ValueError, match="Category is required"):
+            validate_and_sanitize_voucher_data(
+                data, VALID_USER_INFO, VALID_HINTS, VALID_CATEGORIES
+            )

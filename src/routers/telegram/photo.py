@@ -33,13 +33,15 @@ async def handle_photo(
     try:
         local_photo_path = await download_telegram_photo(token, file_id)
 
-        user_categories = list(user_info.get("categorias", {}).keys())
+        user_categories = user_info["categorias"]
         user_accounts_hints = list(user_info.get("cuentas_hints", []))
 
         raw_llm_data = process_expense_with_ai(
             local_photo_path, user_categories, user_accounts_hints
         )
-        sanitized_data = validate_and_sanitize_voucher_data(raw_llm_data)
+        sanitized_data = validate_and_sanitize_voucher_data(
+            raw_llm_data, user_info, user_accounts_hints, user_categories
+        )
 
         transaction_registered = await register_transaction(sanitized_data, user_info)
 
@@ -66,7 +68,7 @@ async def handle_photo(
             "⚙️ Lo siento, nuestro sistema interno está experimentando fallas técnicas en este momento. Por favor, vuelve a intentarlo más tarde. 🙏",
         )
 
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.critical("❌ General processing error")
         send_telegram_message(
             token,

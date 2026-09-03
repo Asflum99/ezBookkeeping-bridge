@@ -17,9 +17,17 @@ curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
      -d "{\"url\": \"${usage_url?}/webhook/telegram/\"}"
 '''
 
+[tasks.debug]
+description = "Dev server with debugpy, waiting for debugger attach"
+run = "uv run python -m debugpy --listen 127.0.0.1:5678 --wait-for-client -m uvicorn main:app --app-dir src --host 127.0.0.1 --port 8000"
+
 [tasks.prod]
 description = "Deploy the FastAPI server in production mode"
 run = "uv run uvicorn main:app --app-dir src --host 0.0.0.0 --port 8000"
+
+[tasks.db-migrate]
+description = "Apply database migrations"
+run = "uv run python src/migrate.py"
 
 [tasks.verify-webhook]
 description = "Verify state of the webhook"
