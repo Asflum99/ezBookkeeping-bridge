@@ -14,7 +14,7 @@ Return a JSON object with these exact 7 keys:
 4. "category" (string or null): Classify the expense into ONE of the exact allowed categories listed below. If the expense cannot be confidently classified into a specific category based on the voucher information, use "Otros Gastos" as the default category.
 5. "comment" (string): Extract a short, concise name of the business, establishment, or recipient person (e.g., "Inkafarma", "Tambo", "Siete Sopas").
 6. "types" (array of integers): Always include [3]. Add 4 → [3, 4] only when a destination bank account is identifiable by its last 3 or 4 digits.
-7. "destination_account" (string or null): Last 3 or 4 digits of the destination bank account if visible in the voucher, else null.
+7. "destination_account" (string or null): Last 3 or 4 numeric digits of the destination bank account if visible in the voucher, else null. Ignore hyphens, spaces, and other non-numeric separators when determining the last digits. (e.g., "088-040-00684265797-88" = "9788")
 
 ## Allowed Payment Accounts
 Select ONE of these exact allowed keys based on the hints provided:
