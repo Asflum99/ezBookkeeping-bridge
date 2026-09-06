@@ -46,7 +46,8 @@ def _get_llm():
             model_provider=provider,
             temperature=0.0,
             api_key=settings.llm_api_key,
-            max_tokens=512,
+            max_tokens=1000,
+            reasoning_effort=settings.llm_reasoning,
         )
     except ModuleNotFoundError:
         raise RuntimeError(
@@ -116,9 +117,14 @@ def process_expense_with_ai(
 
         logger.debug("Sending payload to Vision Model via LangChain...")
 
-        chain = _get_llm() | RunnableLambda(_strip_thinking) | _PARSER
+        if settings.llm_reasoning != "none":
+            chain = _get_llm() | RunnableLambda(_strip_thinking) | _PARSER
+        else:
+            chain = _get_llm() | _PARSER
 
         parsed_data: dict[str, Any] = chain.invoke(messages)
+
+        logger.debug(f"LLM parsed response: {parsed_data}")
 
         logger.info("Successfully extracted voucher data via LangChain.")
         return parsed_data
