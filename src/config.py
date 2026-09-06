@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     ezbookkeeping_url: str
     llm_provider: str
     timezone_str: str = Field(alias="TIMEZONE")
+    llm_reasoning: str = Field(alias="LLM_REASONING")
 
     # Optional environment variables
     telegram_bot_token: str = ""
