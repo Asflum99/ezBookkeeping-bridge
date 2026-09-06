@@ -18,8 +18,7 @@ def build_system_prompt(
     """Format the cached prompt template with user categories and account types."""
     formatted_categories = "\n".join(f"- {cat}" for cat in user_categories)
     formatted_accounts = "\n".join(
-        f'- "{name}": Matches {hints}'
-        for name, hints, _ in user_accounts
+        f'- "{name}": Matches {hints}' for name, hints, _ in user_accounts
     )
     logger.debug(f"Rendered accounts in prompt:\n{formatted_accounts}")
     return settings.system_prompt_template.format(
@@ -47,6 +46,7 @@ def _get_llm():
             model_provider=provider,
             temperature=0.0,
             api_key=settings.llm_api_key,
+            max_tokens=512,
         )
     except ModuleNotFoundError:
         raise RuntimeError(
